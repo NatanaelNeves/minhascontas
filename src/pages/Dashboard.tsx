@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { useAuth } from '@/hooks/useAuth'
 import { useBills } from '@/hooks/useBills'
 import { useMonth } from '@/hooks/useMonth'
 import { useAppStore } from '@/store/useAppStore'
@@ -14,12 +13,11 @@ import { Button } from '@/components/ui/button'
 import { Conta, ContaInput } from '@/types'
 import { formatBRL } from '@/lib/utils'
 
-export function Dashboard() {
-  const { user } = useAuth()
+export function Dashboard({ userId }: { userId: string }) {
   const { mesAtivo } = useAppStore()
-  const { mesInfo, setReceita } = useMonth(user!.uid)
+  const { mesInfo, setReceita } = useMonth(userId)
   const { contas, resumo, addConta, updateConta, deleteConta, togglePago } = useBills(
-    user!.uid,
+    userId,
     mesAtivo,
     mesInfo?.receita ?? 0,
   )

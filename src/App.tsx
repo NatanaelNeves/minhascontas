@@ -13,5 +13,5 @@ export default function App() {
     )
   }
 
-  return user ? <Dashboard /> : <Login />
+  return user ? <Dashboard userId={user.uid} /> : <Login />
 }
