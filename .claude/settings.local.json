@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "PowerShell(New-Item -ItemType Directory -Force -Path \"c:\\\\Users\\\\TECNOLOGIA\\\\minhascontas\\\\docs\\\\superpowers\\\\specs\")",
-      "PowerShell(cd \"c:\\\\Users\\\\TECNOLOGIA\\\\minhascontas\"; $input = [System.Text.Encoding]::UTF8.GetBytes\\(\"y`n\"\\); $process = New-Object System.Diagnostics.Process; $process.StartInfo.FileName = \"npx\"; $process.StartInfo.Arguments = \"create-vite@latest . --template react-ts\"; $process.StartInfo.UseShellExecute = $false; $process.StartInfo.RedirectStandardInput = $true; $process.StartInfo.RedirectStandardOutput = $true; $process.StartInfo.RedirectStandardError = $true; $process.StartInfo.WorkingDirectory = \"c:\\\\Users\\\\TECNOLOGIA\\\\minhascontas\"; $process.Start\\(\\) | Out-Null; $process.StandardInput.WriteLine\\(\"y\"\\); $process.StandardInput.Close\\(\\); $stdout = $process.StandardOutput.ReadToEnd\\(\\); $stderr = $process.StandardError.ReadToEnd\\(\\); $process.WaitForExit\\(\\); Write-Output \"EXIT: $\\($process.ExitCode\\)\"; Write-Output \"STDOUT: $stdout\"; Write-Output \"STDERR: $stderr\")"
-    ]
-  }
-}
