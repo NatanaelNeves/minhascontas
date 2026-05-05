@@ -1,12 +1,14 @@
 import { create } from 'zustand'
 
+type CurrentPage = 'dashboard' | 'history'
+
 interface AppState {
   mesAtivo: string
-  tema: 'dark' | 'light'
   isLoading: boolean
+  currentPage: CurrentPage
   setMesAtivo: (mes: string) => void
-  setTema: (tema: 'dark' | 'light') => void
   setIsLoading: (loading: boolean) => void
+  setCurrentPage: (page: CurrentPage) => void
 }
 
 function getMesAtual(): string {
@@ -14,18 +16,11 @@ function getMesAtual(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 }
 
-function getTemaInicial(): 'dark' | 'light' {
-  return localStorage.getItem('tema') === 'light' ? 'light' : 'dark'
-}
-
 export const useAppStore = create<AppState>((set) => ({
   mesAtivo: getMesAtual(),
-  tema: getTemaInicial(),
   isLoading: false,
+  currentPage: 'dashboard',
   setMesAtivo: (mes) => set({ mesAtivo: mes }),
-  setTema: (tema) => {
-    localStorage.setItem('tema', tema)
-    set({ tema })
-  },
   setIsLoading: (loading) => set({ isLoading: loading }),
+  setCurrentPage: (page) => set({ currentPage: page }),
 }))

@@ -1,22 +1,10 @@
 import { useState, useEffect } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
+import { createPortal } from 'react-dom'
+import { AnimatePresence, motion } from 'framer-motion'
+import { X } from 'lucide-react'
 import { Conta, ContaInput, Categoria, FormaPagamento } from '@/types'
+import { useAppStore } from '@/store/useAppStore'
+import { formatMesLabel } from '@/lib/utils'
 
 interface Props {
   open: boolean
@@ -35,7 +23,88 @@ const DEFAULT_FORM: ContaInput = {
   parcelas: null,
 }
 
+const CATEGORIAS: { value: Categoria; label: string }[] = [
+  { value: 'fixo', label: 'Fixo' },
+  { value: 'cartao', label: 'Cartão' },
+  { value: 'extra', label: 'Extra' },
+]
+
+const FORMAS: { value: FormaPagamento; label: string; icon: string }[] = [
+  { value: 'pix', label: 'Pix', icon: '⚡' },
+  { value: 'debito', label: 'Débito', icon: '💳' },
+  { value: 'boleto', label: 'Boleto', icon: '📄' },
+  { value: 'credito', label: 'Crédito', icon: '🏦' },
+]
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      style={{
+        fontSize: 10,
+        fontWeight: 600,
+        color: 'var(--text-subtle)',
+        letterSpacing: '0.09em',
+        textTransform: 'uppercase',
+        marginBottom: 8,
+      }}
+    >
+      {children}
+    </p>
+  )
+}
+
+function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      style={{
+        width: 40,
+        height: 22,
+        borderRadius: 99,
+        background: on ? '#10B981' : 'rgba(255,255,255,0.1)',
+        position: 'relative',
+        cursor: 'pointer',
+        border: 'none',
+        padding: 0,
+        flexShrink: 0,
+        transition: 'background .2s',
+      }}
+    >
+      <motion.div
+        animate={{ x: on ? 20 : 3 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: '50%',
+          background: '#fff',
+          position: 'absolute',
+          top: 3,
+          left: 0,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+        }}
+      />
+    </button>
+  )
+}
+
+const baseInput = {
+  width: '100%',
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 10,
+  padding: '11px 14px',
+  fontSize: 14,
+  color: '#fff',
+  outline: 'none',
+  fontFamily: 'inherit',
+  transition: 'border-color .15s, background .15s',
+  letterSpacing: '-0.01em',
+} as const
+
 export function BillModal({ open, onClose, onSave, editando }: Props) {
+  const { mesAtivo } = useAppStore()
   const [form, setForm] = useState<ContaInput>(DEFAULT_FORM)
   const [valorStr, setValorStr] = useState('')
   const [temParcelas, setTemParcelas] = useState(false)
@@ -60,6 +129,22 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
     }
   }, [editando, open])
 
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [open, onClose])
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [open])
+
   function parseValor(str: string): number {
     return parseFloat(str.replace(',', '.')) || 0
   }
@@ -74,156 +159,420 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
     onClose()
   }
 
-  return (
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-sm">
-        <DialogHeader>
-          <DialogTitle>{editando ? 'Editar conta' : 'Nova conta'}</DialogTitle>
-        </DialogHeader>
+  const canSave = form.nome.trim().length > 0 && parseValor(valorStr) > 0
 
-        <div className="space-y-4 mt-2">
-          <div className="space-y-1">
-            <Label className="text-zinc-400">Nome</Label>
-            <Input
-              value={form.nome}
-              onChange={e => setForm(f => ({ ...f, nome: e.target.value }))}
-              className="bg-zinc-800 border-zinc-700"
-              placeholder="ex: Aluguel"
-            />
-          </div>
+  function focusInput(e: React.FocusEvent<HTMLInputElement>) {
+    e.target.style.borderColor = 'rgba(124,114,216,0.55)'
+    e.target.style.background = 'rgba(255,255,255,0.06)'
+  }
+  function blurInput(e: React.FocusEvent<HTMLInputElement>) {
+    e.target.style.borderColor = 'rgba(255,255,255,0.08)'
+    e.target.style.background = 'rgba(255,255,255,0.04)'
+  }
 
-          <div className="space-y-1">
-            <Label className="text-zinc-400">Valor (R$)</Label>
-            <Input
-              value={valorStr}
-              onChange={e => setValorStr(e.target.value)}
-              className="bg-zinc-800 border-zinc-700"
-              placeholder="0,00"
-              inputMode="decimal"
-            />
-          </div>
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            key="backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22 }}
+            onClick={onClose}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 50,
+              background: 'rgba(0,0,0,0.65)',
+              backdropFilter: 'blur(6px)',
+              WebkitBackdropFilter: 'blur(6px)',
+            }}
+          />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-zinc-400">Categoria</Label>
-              <Select
-                value={form.categoria}
-                onValueChange={v => setForm(f => ({ ...f, categoria: v as Categoria }))}
+          {/* Side sheet */}
+          <motion.div
+            key="sheet"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 51,
+              width: 'min(420px, 100vw)',
+              background: '#111113',
+              borderLeft: '0.5px solid rgba(255,255,255,0.08)',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {/* Sheet header */}
+            <div
+              style={{
+                padding: '18px 22px',
+                borderBottom: '0.5px solid rgba(255,255,255,0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexShrink: 0,
+              }}
+            >
+              <div>
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: 'var(--text-subtle)',
+                    letterSpacing: '0.09em',
+                    textTransform: 'uppercase',
+                    marginBottom: 3,
+                  }}
+                >
+                  {formatMesLabel(mesAtivo)}
+                </p>
+                <p
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: '#fff',
+                    letterSpacing: '-0.03em',
+                  }}
+                >
+                  {editando ? 'Editar conta' : 'Nova conta'}
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 8,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--text-muted)',
+                  transition: 'background .15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
               >
-                <SelectTrigger className="bg-zinc-800 border-zinc-700">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-zinc-700">
-                  <SelectItem value="fixo">Fixo</SelectItem>
-                  <SelectItem value="cartao">Cartão</SelectItem>
-                  <SelectItem value="extra">Extra</SelectItem>
-                </SelectContent>
-              </Select>
+                <X size={14} />
+              </button>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-zinc-400">Pagamento</Label>
-              <Select
-                value={form.formaPagamento}
-                onValueChange={v => setForm(f => ({ ...f, formaPagamento: v as FormaPagamento }))}
-              >
-                <SelectTrigger className="bg-zinc-800 border-zinc-700">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-zinc-700">
-                  <SelectItem value="pix">PIX</SelectItem>
-                  <SelectItem value="debito">Débito</SelectItem>
-                  <SelectItem value="boleto">Boleto</SelectItem>
-                  <SelectItem value="credito">Crédito</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <Label className="text-zinc-400">Vencimento (opcional)</Label>
-            <Input
-              type="date"
-              value={form.vencimento ?? ''}
-              onChange={e => setForm(f => ({ ...f, vencimento: e.target.value || null }))}
-              className="bg-zinc-800 border-zinc-700 text-white"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Checkbox
-              checked={temParcelas}
-              onCheckedChange={v => setTemParcelas(!!v)}
-              id="parcelas-check"
-            />
-            <Label htmlFor="parcelas-check" className="text-zinc-400 cursor-pointer">
-              Tem parcelas
-            </Label>
-          </div>
-
-          {temParcelas && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-zinc-400">Parcela atual</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={form.parcelas?.atual ?? 1}
-                  onChange={e =>
-                    setForm(f => ({
-                      ...f,
-                      parcelas: { atual: Number(e.target.value), total: f.parcelas?.total ?? 1 },
-                    }))
-                  }
-                  className="bg-zinc-800 border-zinc-700"
+            {/* Sheet body */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '22px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 20,
+              }}
+            >
+              {/* Nome */}
+              <div>
+                <Label>Nome</Label>
+                <input
+                  value={form.nome}
+                  onChange={e => setForm(f => ({ ...f, nome: e.target.value }))}
+                  placeholder="ex: Netflix, Aluguel, Fatura..."
+                  autoFocus
+                  style={baseInput}
+                  onFocus={focusInput}
+                  onBlur={blurInput}
                 />
               </div>
-              <div className="space-y-1">
-                <Label className="text-zinc-400">Total parcelas</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={form.parcelas?.total ?? 1}
-                  onChange={e =>
-                    setForm(f => ({
-                      ...f,
-                      parcelas: { atual: f.parcelas?.atual ?? 1, total: Number(e.target.value) },
-                    }))
-                  }
-                  className="bg-zinc-800 border-zinc-700"
+
+              {/* Valor */}
+              <div>
+                <Label>Valor</Label>
+                <div style={{ position: 'relative' }}>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: 14,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      fontSize: 16,
+                      fontWeight: 600,
+                      color: 'var(--text-subtle)',
+                      pointerEvents: 'none',
+                      letterSpacing: '-0.02em',
+                      userSelect: 'none',
+                    }}
+                  >
+                    R$
+                  </span>
+                  <input
+                    value={valorStr}
+                    onChange={e => setValorStr(e.target.value)}
+                    placeholder="0,00"
+                    inputMode="decimal"
+                    style={{
+                      ...baseInput,
+                      paddingLeft: 46,
+                      fontSize: 30,
+                      fontWeight: 700,
+                      letterSpacing: '-0.05em',
+                      height: 62,
+                    }}
+                    onFocus={focusInput}
+                    onBlur={blurInput}
+                  />
+                </div>
+              </div>
+
+              {/* Categoria — segmented control */}
+              <div>
+                <Label>Categoria</Label>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 3,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 10,
+                    padding: 3,
+                  }}
+                >
+                  {CATEGORIAS.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, categoria: opt.value }))}
+                      style={{
+                        flex: 1,
+                        padding: '8px 6px',
+                        borderRadius: 7,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        border: 'none',
+                        fontFamily: 'inherit',
+                        transition: 'all .15s',
+                        background: form.categoria === opt.value ? 'rgba(255,255,255,0.92)' : 'transparent',
+                        color: form.categoria === opt.value ? '#09090b' : 'var(--text-muted)',
+                        letterSpacing: '-0.01em',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Forma de pagamento — chips arredondados */}
+              <div>
+                <Label>Forma de pagamento</Label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {FORMAS.map(opt => {
+                    const selected = form.formaPagamento === opt.value
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, formaPagamento: opt.value }))}
+                        style={{
+                          padding: '7px 14px',
+                          borderRadius: 99,
+                          fontSize: 13,
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          transition: 'all .15s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          border: selected
+                            ? '1px solid rgba(255,255,255,0.85)'
+                            : '1px solid rgba(255,255,255,0.09)',
+                          background: selected ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.04)',
+                          color: selected ? '#09090b' : 'var(--text-muted)',
+                          letterSpacing: '-0.01em',
+                        }}
+                      >
+                        <span style={{ fontSize: 13 }}>{opt.icon}</span>
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Vencimento */}
+              <div>
+                <Label>Vencimento (opcional)</Label>
+                <input
+                  type="date"
+                  value={form.vencimento ?? ''}
+                  onChange={e => setForm(f => ({ ...f, vencimento: e.target.value || null }))}
+                  style={{
+                    ...baseInput,
+                    color: form.vencimento ? '#fff' : 'var(--text-subtle)',
+                    colorScheme: 'dark',
+                  }}
+                  onFocus={focusInput}
+                  onBlur={blurInput}
                 />
               </div>
+
+              {/* Parcelado — toggle */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 10,
+                }}
+              >
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 500, color: '#fff', letterSpacing: '-0.01em' }}>
+                    Parcelado
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 2 }}>
+                    Dividido em várias parcelas
+                  </p>
+                </div>
+                <Toggle on={temParcelas} onToggle={() => setTemParcelas(v => !v)} />
+              </div>
+
+              <AnimatePresence>
+                {temParcelas && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    style={{ display: 'flex', gap: 12, overflow: 'hidden' }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <Label>Parcela atual</Label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={form.parcelas?.atual ?? 1}
+                        onChange={e =>
+                          setForm(f => ({
+                            ...f,
+                            parcelas: { atual: Number(e.target.value), total: f.parcelas?.total ?? 1 },
+                          }))
+                        }
+                        style={{ ...baseInput, textAlign: 'center', fontSize: 18, fontWeight: 600 }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <Label>Total</Label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={form.parcelas?.total ?? 1}
+                        onChange={e =>
+                          setForm(f => ({
+                            ...f,
+                            parcelas: { atual: f.parcelas?.atual ?? 1, total: Number(e.target.value) },
+                          }))
+                        }
+                        style={{ ...baseInput, textAlign: 'center', fontSize: 18, fontWeight: 600 }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Pago — toggle */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 10,
+                }}
+              >
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 500, color: '#fff', letterSpacing: '-0.01em' }}>
+                    Já foi pago
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 2 }}>
+                    Marcar como pago agora
+                  </p>
+                </div>
+                <Toggle on={form.pago} onToggle={() => setForm(f => ({ ...f, pago: !f.pago }))} />
+              </div>
             </div>
-          )}
 
-          <div className="flex items-center gap-2">
-            <Checkbox
-              checked={form.pago}
-              onCheckedChange={v => setForm(f => ({ ...f, pago: !!v }))}
-              id="pago-check"
-            />
-            <Label htmlFor="pago-check" className="text-zinc-400 cursor-pointer">
-              Já foi pago
-            </Label>
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="flex-1 border-zinc-700 text-zinc-300"
+            {/* Sheet footer */}
+            <div
+              style={{
+                padding: '14px 22px',
+                borderTop: '0.5px solid rgba(255,255,255,0.06)',
+                display: 'flex',
+                gap: 8,
+                flexShrink: 0,
+              }}
             >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSave}
-              className="flex-1 bg-white text-zinc-900 hover:bg-zinc-100"
-            >
-              Salvar
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+              <button
+                onClick={onClose}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: 10,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'var(--text-muted)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  letterSpacing: '-0.01em',
+                  transition: 'color .15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!canSave}
+                style={{
+                  flex: 2,
+                  padding: '12px',
+                  borderRadius: 10,
+                  background: canSave ? 'rgba(255,255,255,0.94)' : 'rgba(255,255,255,0.06)',
+                  border: 'none',
+                  color: canSave ? '#09090b' : 'var(--text-subtle)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  fontFamily: 'inherit',
+                  cursor: canSave ? 'pointer' : 'not-allowed',
+                  transition: 'all .2s',
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                {editando ? 'Salvar alterações' : 'Adicionar conta'}
+              </button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body
   )
 }

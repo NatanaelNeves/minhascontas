@@ -13,6 +13,15 @@ export function formatBRL(value: number): string {
   }).format(value)
 }
 
+export function formatBRLShort(value: number): string {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  }).format(Math.round(value))
+}
+
 export function calcResumo(contas: Conta[], receita: number): ResumoMes {
   const totalPago = contas
     .filter(c => c.pago)
@@ -39,6 +48,58 @@ export function calcResumo(contas: Conta[], receita: number): ResumoMes {
   }
 
   return { totalPago, totalPendente, totalGeral, sobra, percentualPago, saudePrimaria }
+}
+
+export function prevMesId(mesId: string): string {
+  const [year, month] = mesId.split('-').map(Number)
+  const d = new Date(year, month - 2, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+export function nextMesId(mesId: string): string {
+  const [year, month] = mesId.split('-').map(Number)
+  const d = new Date(year, month, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+export function formatMesLabel(mesId: string): string {
+  const [year, month] = mesId.split('-')
+  const date = new Date(Number(year), Number(month) - 1, 1)
+  return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+}
+
+const AVATAR_BG = [
+  'rgba(127,119,221,0.15)',
+  'rgba(29,158,117,0.12)',
+  'rgba(55,138,221,0.12)',
+  'rgba(239,159,39,0.12)',
+  'rgba(212,83,126,0.12)',
+]
+
+export function getBillAvatarBg(nome: string): string {
+  const hash = nome.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+  return AVATAR_BG[hash % AVATAR_BG.length]
+}
+
+export function getBillEmoji(nome: string): string {
+  const l = nome.toLowerCase()
+  if (/faculdade|escola|curso|facul/.test(l)) return '🎓'
+  if (/celular|iphone|samsung|telefon/.test(l)) return '📱'
+  if (/internet|wifi|banda|fibra|vivo|claro|tim/.test(l)) return '📡'
+  if (/seguro/.test(l)) return '🛡️'
+  if (/nubank|picpay|neon|inter|itaú|bradesco|fatura|cartão|cartao/.test(l)) return '💳'
+  if (/emprestimo|empréstimo|financiamento/.test(l)) return '📊'
+  if (/aluguel|condom|iptu/.test(l)) return '🏠'
+  if (/mercado|shopee|amazon|magalu/.test(l)) return '🛍️'
+  if (/formatura|festa|evento|aniversar/.test(l)) return '🎉'
+  if (/depilação|depilacao|estetica|estética|salão|salon|beleza|cabelo|dandara/.test(l)) return '✨'
+  if (/academia|gym|fitness/.test(l)) return '💪'
+  if (/gas|água|agua|luz|energia|eletric/.test(l)) return '⚡'
+  if (/netflix|spotify|prime|disney|stream/.test(l)) return '🎬'
+  if (/combustivel|gasolina|uber|99|ifood/.test(l)) return '🚗'
+  if (/farmacia|remedio|médico|medico|saude|plano/.test(l)) return '💊'
+  if (/shopee|aliexpress/.test(l)) return '📦'
+  return '📄'
 }
 
 export function getAlertaVencimento(

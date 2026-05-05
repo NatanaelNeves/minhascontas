@@ -1,10 +1,8 @@
-import { motion } from 'framer-motion'
-import { Trash2, Pencil } from 'lucide-react'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Pencil, Trash2 } from 'lucide-react'
 import { Conta } from '@/types'
-import { formatBRL, getAlertaVencimento } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Button } from '@/components/ui/button'
+import { formatBRL, getAlertaVencimento, getBillEmoji, getBillAvatarBg } from '@/lib/utils'
 
 interface Props {
   conta: Conta
@@ -14,98 +12,213 @@ interface Props {
 }
 
 const FORMA_LABEL: Record<string, string> = {
-  pix: 'PIX',
+  pix: 'Pix',
   debito: 'Débito',
   boleto: 'Boleto',
   credito: 'Crédito',
 }
 
 export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
+  const [confirmando, setConfirmando] = useState(false)
   const alerta = getAlertaVencimento(conta.vencimento, conta.pago)
+  const emoji = getBillEmoji(conta.nome)
+  const avatarBg = getBillAvatarBg(conta.nome)
 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, x: -8 }}
+      initial={{ opacity: 0, x: -6 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 8 }}
-      className="flex items-center gap-3 py-3 border-b border-zinc-800 last:border-0"
+      exit={{ opacity: 0, x: 6 }}
+      className="group flex items-center gap-3 px-4 py-[12px] transition-colors"
+      style={{
+        borderBottom: '0.5px solid var(--divider)',
+        cursor: 'default',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.025)')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
     >
-      <Checkbox
-        checked={conta.pago}
-        onCheckedChange={(checked) => onTogglePago(conta.id, !!checked)}
-        className="border-zinc-600"
-      />
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span
-            className={`text-sm font-medium truncate ${
-              conta.pago ? 'text-zinc-500 line-through' : 'text-white'
-            }`}
+      {/* Checkbox toggle */}
+      <button
+        onClick={() => onTogglePago(conta.id, !conta.pago)}
+        className="w-[18px] h-[18px] rounded-[5px] flex-shrink-0 flex items-center justify-center transition-all"
+        style={
+          conta.pago
+            ? {
+                background: '#10B981',
+                border: '1.5px solid #10B981',
+              }
+            : {
+                border: '1.5px solid rgba(255,255,255,0.15)',
+                background: 'transparent',
+              }
+        }
+      >
+        {conta.pago && (
+          <motion.svg
+            initial={{ scale: 0.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+            width="9"
+            height="9"
+            viewBox="0 0 9 9"
+            fill="none"
           >
-            {conta.nome}
-          </span>
+            <path
+              d="M1.5 4.5l2 2L7.5 2.5"
+              stroke="white"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </motion.svg>
+        )}
+      </button>
+
+      {/* Emoji avatar */}
+      <div
+        className="w-[32px] h-[32px] rounded-[9px] flex-shrink-0 flex items-center justify-center text-[14px]"
+        style={{ background: avatarBg }}
+      >
+        {emoji}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <p
+          className="text-[13px] font-medium truncate"
+          style={
+            conta.pago
+              ? {
+                  color: 'var(--text-subtle)',
+                  textDecoration: 'line-through',
+                  textDecorationColor: 'rgba(255,255,255,0.18)',
+                }
+              : { color: '#fff' }
+          }
+        >
+          {conta.nome}
+        </p>
+        <p className="text-[11px] mt-[1px]" style={{ color: 'var(--text-subtle)' }}>
+          {FORMA_LABEL[conta.formaPagamento]}
+        </p>
+      </div>
+
+      {/* Right column */}
+      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+        <span
+          className="text-[13px] font-semibold tabular-nums"
+          style={conta.pago ? { color: 'var(--text-subtle)' } : { color: '#fff', letterSpacing: '-0.02em' }}
+        >
+          {formatBRL(conta.valor)}
+        </span>
+
+        <div className="flex items-center gap-1 flex-wrap justify-end">
           {conta.parcelas && (
-            <span className="text-xs text-zinc-500">
+            <span
+              className="text-[10px] font-medium px-1.5 py-[2px] rounded-full"
+              style={{
+                background: 'rgba(124,114,216,0.12)',
+                color: '#9D94E8',
+                border: '0.5px solid rgba(124,114,216,0.22)',
+                letterSpacing: '0.01em',
+              }}
+            >
               {conta.parcelas.atual}/{conta.parcelas.total}
             </span>
           )}
-          {alerta === 'vencida' && (
-            <Badge variant="destructive" className="text-xs py-0 h-4">
-              Vencida
-            </Badge>
-          )}
-          {alerta === 'vence_em_breve' && (
-            <Badge className="text-xs py-0 h-4 bg-yellow-900 text-yellow-400 hover:bg-yellow-900">
-              Vence em breve
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs text-zinc-500">{FORMA_LABEL[conta.formaPagamento]}</span>
-          {conta.vencimento && (
+
+          {alerta === 'vencida' && !conta.pago && (
             <span
-              className={`text-xs ${
-                alerta === 'vencida'
-                  ? 'text-red-400'
-                  : alerta === 'vence_em_breve'
-                  ? 'text-yellow-400'
-                  : 'text-zinc-500'
-              }`}
+              className="text-[10px] font-medium px-1.5 py-[2px] rounded-full"
+              style={{
+                background: 'rgba(239,68,68,0.1)',
+                color: '#F87171',
+                border: '0.5px solid rgba(239,68,68,0.2)',
+              }}
             >
-              vence {new Date(conta.vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}
+              Vencida
+            </span>
+          )}
+
+          {alerta === 'vence_em_breve' && !conta.pago && (
+            <span
+              className="text-[10px] font-medium px-1.5 py-[2px] rounded-full"
+              style={{
+                background: 'rgba(245,158,11,0.1)',
+                color: '#FBBF24',
+                border: '0.5px solid rgba(245,158,11,0.2)',
+              }}
+            >
+              Vence em breve
             </span>
           )}
         </div>
       </div>
 
-      <span
-        className={`text-sm font-semibold whitespace-nowrap ${
-          conta.pago ? 'text-green-400' : 'text-zinc-300'
-        }`}
-      >
-        {formatBRL(conta.valor)}
-      </span>
-
-      <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => onEdit(conta)}
-          className="h-7 w-7 text-zinc-500 hover:text-white"
-        >
-          <Pencil className="w-3.5 h-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => onDelete(conta.id)}
-          className="h-7 w-7 text-zinc-500 hover:text-red-400"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </Button>
-      </div>
+      {/* Hover actions */}
+      <AnimatePresence mode="wait">
+        {confirmando ? (
+          <motion.div
+            key="confirm"
+            initial={{ opacity: 0, scale: 0.88 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.88 }}
+            transition={{ duration: 0.1 }}
+            className="flex items-center gap-1 ml-1 flex-shrink-0"
+          >
+            <button
+              onClick={() => { onDelete(conta.id); setConfirmando(false) }}
+              className="text-[11px] font-medium px-2 py-[3px] rounded-md transition-colors"
+              style={{
+                background: 'rgba(239,68,68,0.12)',
+                color: '#F87171',
+                border: '0.5px solid rgba(239,68,68,0.22)',
+              }}
+            >
+              Excluir
+            </button>
+            <button
+              onClick={() => setConfirmando(false)}
+              className="text-[11px] font-medium px-2 py-[3px] rounded-md"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                color: 'var(--text-subtle)',
+                border: '0.5px solid rgba(255,255,255,0.08)',
+              }}
+            >
+              Não
+            </button>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="actions"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex-shrink-0"
+          >
+            <button
+              onClick={() => onEdit(conta)}
+              className="w-6 h-6 rounded-md flex items-center justify-center transition-colors"
+              style={{ color: 'var(--text-subtle)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-subtle)')}
+            >
+              <Pencil className="w-[11px] h-[11px]" />
+            </button>
+            <button
+              onClick={() => setConfirmando(true)}
+              className="w-6 h-6 rounded-md flex items-center justify-center transition-colors"
+              style={{ color: 'var(--text-subtle)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#F87171')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-subtle)')}
+            >
+              <Trash2 className="w-[11px] h-[11px]" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
