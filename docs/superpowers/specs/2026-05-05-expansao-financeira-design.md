@@ -76,6 +76,11 @@ export type CategoriaGasto =
   | 'educacao' | 'moradia' | 'vestuario' | 'servicos'
   | 'despesaFixa' | 'outros'
 
+export interface TransacaoOrigem {
+  tipo: 'bill' | 'receivable'
+  id: string   // id do doc de origem (bill ou receivable)
+}
+
 type TransacaoBase = {
   id: string
   data: string           // "YYYY-MM-DD"
@@ -84,6 +89,7 @@ type TransacaoBase = {
   valor: number
   despesaFixa: boolean
   observacao: string
+  origem?: TransacaoOrigem  // presente em transações geradas por bill/receivable toggle
   criadoEm: Date
 }
 
@@ -127,7 +133,8 @@ interface UseBanksReturn {
 ```
 
 - `onSnapshot` em `banks/`
-- `BancoComSaldo[]` calculado via `useMemo([bancosRaw, transacoes])`
+- **Performance**: pré-agrupa transações por `bancoId` num único `useMemo(transacoes)` → `Record<string, Transacao[]>`. Cada banco lê só seu grupo. O(n) uma vez, não O(n×m).
+- `BancoComSaldo[]` calculado via segundo `useMemo([bancosRaw, porBanco])` onde `porBanco` é o mapa acima
 - `totalSaldo = bancos.reduce((acc, b) => acc + b.saldoAtual, 0)`
 
 ### `useTransactions(userId, mesId)`
@@ -161,16 +168,28 @@ interface UseReceivablesReturn {
   addRecebivel: (r: AReceberInput) => Promise<void>
   updateRecebivel: (id: string, data: Partial<AReceberInput>) => Promise<void>
   deleteRecebivel: (id: string) => Promise<void>
-  marcarRecebido: (
-    id: string,
-    bancoId: string,
-    addTransacao: (t: TransacaoInput) => Promise<void>
-  ) => Promise<void>
+  marcarRecebido: (id: string, bancoId: string) => Promise<void>
+  desmarcarRecebido: (id: string) => Promise<void>
 }
 ```
 
-- `marcarRecebido` recebe `addTransacao` como dependência injetada (sem acoplamento entre hooks)
+- `marcarRecebido` usa `writeBatch` internamente: `updateRecebivel + setDoc(novaTransacao)` em batch atômico
+- `desmarcarRecebido` busca transação com `origem.tipo === 'receivable' && origem.id === id` → batch `updateRecebivel({ recebido: false }) + deleteDoc(transacaoEncontrada)`. Se transação não existir (deletada manualmente), apenas desmarca o receivable.
 - `totalPendente = recebiveis.filter(r => !r.recebido).reduce(...)`
+
+### Adições em `useBills`
+
+`togglePago` existente trata apenas toggle simples (sem banco). Adicionar:
+
+```ts
+togglePagoComBanco: (id: string, pago: boolean, bancoId: string, contaData: { nome: string; valor: number }) => Promise<void>
+desfazerPagamento: (id: string, transacoes: Transacao[]) => Promise<void>
+```
+
+- `togglePagoComBanco`: `writeBatch` → `update(billRef, { pago }) + set(novaTransacaoRef, { ...payload, origem: { tipo: 'bill', id } })`
+- `desfazerPagamento`: encontra transação com `origem.tipo === 'bill' && origem.id === id` na lista de transacoes recebida como arg → `writeBatch` → `update(billRef, { pago: false }) + deleteDoc(transacaoRef)`. Sem transação → apenas desmarca.
+
+Ambos precisam de acesso ao path `transactions/` — constroem via `users/${userId}/months/${mesId}/transactions`.
 
 ### Orquestração em `Dashboard.tsx`
 
@@ -259,21 +278,21 @@ Se `bancos.length === 0`, modal exibe estado vazio: "Nenhum banco cadastrado. Ad
 1. Toggle em `BillItem`
 2. `pago: true` → abre `SelectBancoModal` antes de confirmar
 3. Usuário seleciona banco → confirma
-4. Writes em sequência:
-   - `updateConta(id, { pago: true })`
-   - `addTransacao({ tipo: 'gasto', despesaFixa: true, bancoId, valor: conta.valor, descricao: conta.nome, data: hoje, categoria: 'despesaFixa', observacao: '' })`
+4. **`writeBatch` atômico** (um commit):
+   - `update(billRef, { pago: true })`
+   - `set(novaTransacaoRef, { tipo: 'gasto', despesaFixa: true, bancoId, valor: conta.valor, descricao: conta.nome, data: hoje, categoria: 'despesaFixa', observacao: '', origem: { tipo: 'bill', id: conta.id } })`
 5. Fechar modal sem confirmar → bill não marcada como paga
 
-**Regra:** desmarcar como pago não deleta a transação gerada. Usuário deleta manualmente.
+**Desmarcar (pago → false):** chama `desfazerPagamento(id, transacoes)` → batch atômico: desmarca bill + deleta transação vinculada (se existir). Se usuário deletou a transação manualmente, apenas desmarca.
 
 ### Fluxo 4 — Marcar A Receber como recebido
 1. Toggle em `ReceivableItem`
 2. `SelectBancoModal`
-3. Writes em sequência:
-   - `updateRecebivel(id, { recebido: true })`
-   - `addTransacao({ tipo: 'entrada', bancoId, valor: recebivel.valor, descricao: recebivel.nome, data: hoje, observacao: '' })`
+3. **`writeBatch` atômico**:
+   - `update(recebivelRef, { recebido: true })`
+   - `set(novaTransacaoRef, { tipo: 'entrada', bancoId, valor: recebivel.valor, descricao: recebivel.nome, data: hoje, observacao: '', origem: { tipo: 'receivable', id: recebivel.id } })`
 
-**Regra:** desmarcar recebido não deleta a transação gerada.
+**Desmarcar:** `desmarcarRecebido(id)` → batch atômico: desmarca receivable + deleta transação vinculada (se existir).
 
 ---
 
