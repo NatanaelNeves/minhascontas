@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BillList } from '@/components/BillList/BillList'
 import { BillModal } from '@/components/Modals/BillModal'
 import { SelectBancoModal } from '@/components/Modals/SelectBancoModal'
@@ -32,6 +32,12 @@ export function ContasTab({
   const [billModalOpen, setBillModalOpen] = useState(false)
   const [editando, setEditando] = useState<Conta | null>(null)
   const [pendingToggleId, setPendingToggleId] = useState<string | null>(null)
+
+  useEffect(() => {
+    function openAdd() { setEditando(null); setBillModalOpen(true) }
+    document.addEventListener('fab-contas', openAdd)
+    return () => document.removeEventListener('fab-contas', openAdd)
+  }, [])
 
   function handleToggle(id: string, pago: boolean) {
     if (pago) {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Transacao, TransacaoInput, BancoComSaldo } from '@/types'
 import { TransactionList } from '@/components/Transactions/TransactionList'
 import { TransactionModal } from '@/components/Transactions/TransactionModal'
@@ -14,6 +14,12 @@ interface Props {
 export function GastosTab({ transacoes, bancos, onAdd, onUpdate, onDelete }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editando, setEditando] = useState<Transacao | null>(null)
+
+  useEffect(() => {
+    function openAdd() { setEditando(null); setModalOpen(true) }
+    document.addEventListener('fab-gastos', openAdd)
+    return () => document.removeEventListener('fab-gastos', openAdd)
+  }, [])
 
   function handleSave(data: TransacaoInput) {
     if (editando) onUpdate(editando.id, data)

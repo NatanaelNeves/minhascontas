@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AReceber, AReceberInput, BancoComSaldo } from '@/types'
 import { ReceivableItem } from './ReceivableItem'
 import { ReceivableModal } from './ReceivableModal'
@@ -28,6 +28,12 @@ export function ReceivableList({
   const [formOpen, setFormOpen] = useState(false)
   const [editando, setEditando] = useState<AReceber | null>(null)
   const [selectBancoId, setSelectBancoId] = useState<string | null>(null)
+
+  useEffect(() => {
+    function openAdd() { setEditando(null); setFormOpen(true) }
+    document.addEventListener('fab-receber', openAdd)
+    return () => document.removeEventListener('fab-receber', openAdd)
+  }, [])
 
   function handleToggle(id: string) {
     const r = recebiveis.find(x => x.id === id)

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { BancoComSaldo, BancoInput, Banco } from '@/types'
 import { BankCard } from './BankCard'
@@ -15,6 +15,12 @@ export function BankList({ bancos, onAdd, onUpdate, onDelete }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editando, setEditando] = useState<Banco | null>(null)
   const [erroDelete, setErroDelete] = useState<string | null>(null)
+
+  useEffect(() => {
+    function openAdd() { setEditando(null); setModalOpen(true) }
+    document.addEventListener('fab-bancos', openAdd)
+    return () => document.removeEventListener('fab-bancos', openAdd)
+  }, [])
 
   function handleEdit(banco: BancoComSaldo) {
     setEditando(banco)
