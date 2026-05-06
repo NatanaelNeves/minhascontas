@@ -1,4 +1,4 @@
-import { writeBatch, doc, collection, serverTimestamp } from 'firebase/firestore'
+import { writeBatch, doc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useFirestore } from './useFirestore'
 import { calcResumo } from '@/lib/utils'
