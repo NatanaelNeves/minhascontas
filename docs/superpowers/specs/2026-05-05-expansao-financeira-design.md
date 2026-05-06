@@ -83,15 +83,20 @@ export interface TransacaoOrigem {
 
 type TransacaoBase = {
   id: string
-  data: string           // "YYYY-MM-DD"
+  data: string             // "YYYY-MM-DD" — data do evento original, não "hoje"
   descricao: string
   bancoId: string
   valor: number
-  despesaFixa: boolean
-  observacao: string
-  origem?: TransacaoOrigem  // presente em transações geradas por bill/receivable toggle
+  despesaFixa: boolean     // true quando origem.tipo === 'bill' OU quando usuário marca manualmente
+  observacao?: string      // opcional — omitido quando vazio
+  origem?: TransacaoOrigem // presente em transações geradas por toggle de bill/receivable
   criadoEm: Date
 }
+
+// Regra de ID determinístico:
+// Transações geradas por toggle usam ID fixo: `bill_{contaId}` ou `receivable_{recebivelId}`
+// Transações manuais usam addDoc() com ID aleatório (sem origem)
+// Isso garante idempotência: setDoc sobrescreve, deleteDoc é trivial
 
 type TransacaoGasto = TransacaoBase & {
   tipo: 'gasto'
@@ -173,8 +178,9 @@ interface UseReceivablesReturn {
 }
 ```
 
-- `marcarRecebido` usa `writeBatch` internamente: `updateRecebivel + setDoc(novaTransacao)` em batch atômico
-- `desmarcarRecebido` busca transação com `origem.tipo === 'receivable' && origem.id === id` → batch `updateRecebivel({ recebido: false }) + deleteDoc(transacaoEncontrada)`. Se transação não existir (deletada manualmente), apenas desmarca o receivable.
+- `marcarRecebido`: ID da transação = `receivable_${id}` (determinístico). `writeBatch` → `update(recebivelRef, { recebido: true }) + setDoc(doc(txCol, 'receivable_'+id), payload)`. Idempotente.
+  - `data` da transação: `recebivel.dataPrevista ?? hoje`
+- `desmarcarRecebido`: sem busca. `writeBatch` → `update(recebivelRef, { recebido: false }) + deleteDoc(doc(txCol, 'receivable_'+id))`. Firestore ignora deleteDoc de doc inexistente.
 - `totalPendente = recebiveis.filter(r => !r.recebido).reduce(...)`
 
 ### Adições em `useBills`
@@ -182,14 +188,15 @@ interface UseReceivablesReturn {
 `togglePago` existente trata apenas toggle simples (sem banco). Adicionar:
 
 ```ts
-togglePagoComBanco: (id: string, pago: boolean, bancoId: string, contaData: { nome: string; valor: number }) => Promise<void>
-desfazerPagamento: (id: string, transacoes: Transacao[]) => Promise<void>
+togglePagoComBanco: (id: string, bancoId: string, contaData: { nome: string; valor: number; vencimento: string | null }) => Promise<void>
+desfazerPagamento: (id: string) => Promise<void>
 ```
 
-- `togglePagoComBanco`: `writeBatch` → `update(billRef, { pago }) + set(novaTransacaoRef, { ...payload, origem: { tipo: 'bill', id } })`
-- `desfazerPagamento`: encontra transação com `origem.tipo === 'bill' && origem.id === id` na lista de transacoes recebida como arg → `writeBatch` → `update(billRef, { pago: false }) + deleteDoc(transacaoRef)`. Sem transação → apenas desmarca.
+- `togglePagoComBanco`: ID da transação = `bill_${id}` (determinístico). `writeBatch` → `update(billRef, { pago: true }) + setDoc(doc(txCol, 'bill_'+id), payload)`. Idempotente: segundo clique sobrescreve sem duplicar.
+  - `data` da transação: `conta.vencimento ?? hoje` (preserva data real do evento)
+- `desfazerPagamento`: ID determinístico elimina busca. `writeBatch` → `update(billRef, { pago: false }) + deleteDoc(doc(txCol, 'bill_'+id))`. Se doc não existir, Firestore ignora deleteDoc silenciosamente.
 
-Ambos precisam de acesso ao path `transactions/` — constroem via `users/${userId}/months/${mesId}/transactions`.
+Ambos constroem path `users/${userId}/months/${mesId}/transactions` internamente.
 
 ### Orquestração em `Dashboard.tsx`
 
@@ -278,21 +285,30 @@ Se `bancos.length === 0`, modal exibe estado vazio: "Nenhum banco cadastrado. Ad
 1. Toggle em `BillItem`
 2. `pago: true` → abre `SelectBancoModal` antes de confirmar
 3. Usuário seleciona banco → confirma
-4. **`writeBatch` atômico** (um commit):
+4. `togglePagoComBanco(id, bancoId, { nome, valor, vencimento })` → **`writeBatch` atômico**:
    - `update(billRef, { pago: true })`
-   - `set(novaTransacaoRef, { tipo: 'gasto', despesaFixa: true, bancoId, valor: conta.valor, descricao: conta.nome, data: hoje, categoria: 'despesaFixa', observacao: '', origem: { tipo: 'bill', id: conta.id } })`
+   - `setDoc(doc(txCol, 'bill_'+id), { tipo: 'gasto', despesaFixa: true, bancoId, valor: conta.valor, descricao: conta.nome, data: conta.vencimento ?? hoje, categoria: 'despesaFixa', origem: { tipo: 'bill', id } })`
 5. Fechar modal sem confirmar → bill não marcada como paga
+6. Segundo clique (idempotente) → `setDoc` sobrescreve sem criar duplicata
 
-**Desmarcar (pago → false):** chama `desfazerPagamento(id, transacoes)` → batch atômico: desmarca bill + deleta transação vinculada (se existir). Se usuário deletou a transação manualmente, apenas desmarca.
+**Desmarcar (pago → false):** `desfazerPagamento(id)` → batch: `update(billRef, { pago: false }) + deleteDoc(doc(txCol, 'bill_'+id))`. Sem busca de transação.
 
 ### Fluxo 4 — Marcar A Receber como recebido
 1. Toggle em `ReceivableItem`
 2. `SelectBancoModal`
-3. **`writeBatch` atômico**:
+3. `marcarRecebido(id, bancoId)` → **`writeBatch` atômico**:
    - `update(recebivelRef, { recebido: true })`
-   - `set(novaTransacaoRef, { tipo: 'entrada', bancoId, valor: recebivel.valor, descricao: recebivel.nome, data: hoje, observacao: '', origem: { tipo: 'receivable', id: recebivel.id } })`
+   - `setDoc(doc(txCol, 'receivable_'+id), { tipo: 'entrada', bancoId, valor: recebivel.valor, descricao: recebivel.nome, data: recebivel.dataPrevista ?? hoje, origem: { tipo: 'receivable', id } })`
 
-**Desmarcar:** `desmarcarRecebido(id)` → batch atômico: desmarca receivable + deleta transação vinculada (se existir).
+**Desmarcar:** `desmarcarRecebido(id)` → batch: `update(recebivelRef, { recebido: false }) + deleteDoc(doc(txCol, 'receivable_'+id))`. Sem busca.
+
+### Regra: edição de transações com origem
+
+Transações geradas por toggle (com campo `origem`) são **somente leitura** na UI. `TransactionItem` detecta `origem` e oculta botão de editar — apenas delete via botão de desmarcar na aba de origem. Transações manuais (sem `origem`) são livremente editáveis.
+
+### Regra: delete de banco com transações vinculadas
+
+`deleteBanco(id)` verifica se existem transações com `bancoId === id` (via lista de transacoes do hook pai). Se existirem → **bloqueia** e exibe: "Banco possui lançamentos — remova-os antes de deletar." Se não existirem → permite delete.
 
 ---
 
@@ -338,6 +354,21 @@ Adicionar (usar o tipo `AbaAtiva` exportado em `types/index.ts`):
 abaAtiva: AbaAtiva
 setAbaAtiva: (aba: AbaAtiva) => void
 ```
+
+---
+
+## Índices Firestore necessários
+
+Adicionar em `firestore.indexes.json`:
+
+```json
+{ "collectionGroup": "transactions", "fields": [
+    { "fieldPath": "bancoId", "order": "ASCENDING" },
+    { "fieldPath": "data",    "order": "DESCENDING" }
+]}
+```
+
+Índice simples em `data desc` provavelmente criado automaticamente pelo Firestore; o composto `(bancoId, data desc)` precisa ser declarado explicitamente para queries futuras de histórico por banco.
 
 ---
 
