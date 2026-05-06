@@ -1,21 +1,27 @@
 import { useState, useEffect, useRef } from 'react'
 import { FileDown } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useBills } from '@/hooks/useBills'
 import { useMonth } from '@/hooks/useMonth'
+import { useTransactions } from '@/hooks/useTransactions'
+import { useBanks } from '@/hooks/useBanks'
+import { useReceivables } from '@/hooks/useReceivables'
 import { useAppStore } from '@/store/useAppStore'
 import { Header } from '@/components/ui/Header'
-import { ResumoCards } from '@/components/Dashboard/ResumoCards'
-import { BillList } from '@/components/BillList/BillList'
-import { BillModal } from '@/components/Modals/BillModal'
+import { BottomNav } from '@/components/BottomNav/BottomNav'
 import { ReceitaModal } from '@/components/Modals/ReceitaModal'
 import { CopiarFixosModal } from '@/components/Modals/CopiarFixosModal'
-import { ChartsPizza } from '@/components/Charts/ChartsPizza'
-import { Conta, ContaInput } from '@/types'
+import { HomeTab } from './HomeTab'
+import { ContasTab } from './ContasTab'
+import { GastosTab } from './GastosTab'
+import { BancosTab } from './BancosTab'
+import { ReceberTab } from './ReceberTab'
+import { AbaAtiva } from '@/types'
 import { prevMesId } from '@/lib/utils'
 
 export function Dashboard({ userId }: { userId: string }) {
-  const { mesAtivo } = useAppStore()
+  const { mesAtivo, abaAtiva, setAbaAtiva } = useAppStore()
+
   const {
     mesInfo,
     isLoading: isMonthLoading,
@@ -24,15 +30,45 @@ export function Dashboard({ userId }: { userId: string }) {
     copiarFixos,
     mesExiste,
   } = useMonth(userId)
-  const { contas, resumo, addConta, updateConta, deleteConta, togglePago } = useBills(
+
+  const {
+    contas,
+    resumo,
+    addConta,
+    updateConta,
+    deleteConta,
+    togglePagoComBanco,
+    desfazerPagamento,
+  } = useBills(userId, mesAtivo, mesInfo?.receita ?? 0)
+
+  const {
+    transacoes,
+    totalGastos,
+    totalEntradas,
+    gastosPorCategoria,
+    gastosPorDia,
+    addTransacao,
+    updateTransacao,
+    deleteTransacao,
+  } = useTransactions(userId, mesAtivo)
+
+  const { bancos, totalSaldo, addBanco, updateBanco, deleteBanco } = useBanks(
     userId,
     mesAtivo,
-    mesInfo?.receita ?? 0,
+    transacoes,
   )
 
-  const [billModalOpen, setBillModalOpen] = useState(false)
+  const {
+    recebiveis,
+    totalPendente,
+    addRecebivel,
+    updateRecebivel,
+    deleteRecebivel,
+    marcarRecebido,
+    desmarcarRecebido,
+  } = useReceivables(userId, mesAtivo)
+
   const [receitaModalOpen, setReceitaModalOpen] = useState(false)
-  const [editando, setEditando] = useState<Conta | null>(null)
   const [copiarModalOpen, setCopiarModalOpen] = useState(false)
   const [mesOrigemId, setMesOrigemId] = useState('')
   const inicializadoRef = useRef<Set<string>>(new Set())
@@ -41,7 +77,6 @@ export function Dashboard({ userId }: { userId: string }) {
     if (isMonthLoading || mesInfo !== null) return
     if (inicializadoRef.current.has(mesAtivo)) return
     inicializadoRef.current.add(mesAtivo)
-
     const prevId = prevMesId(mesAtivo)
     mesExiste(prevId).then(async (existe) => {
       if (existe) {
@@ -59,41 +94,35 @@ export function Dashboard({ userId }: { userId: string }) {
     setCopiarModalOpen(false)
   }
 
-  async function handlePularCopia() {
-    await criarMes(mesAtivo, 0)
-    setCopiarModalOpen(false)
-  }
-
-  function handleSaveBill(data: ContaInput) {
-    if (editando) {
-      updateConta(editando.id, data)
-    } else {
-      addConta(data)
-    }
-    setEditando(null)
-  }
-
-  function handleEdit(conta: Conta) {
-    setEditando(conta)
-    setBillModalOpen(true)
-  }
-
-  function handleOpenNew() {
-    setEditando(null)
-    setBillModalOpen(true)
-  }
-
   async function exportarPDF() {
     const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
       import('html2canvas'),
       import('jspdf'),
     ])
-    const el = document.getElementById('dashboard-content')
+    const el = document.getElementById('tab-content')
     if (!el) return
     const canvas = await html2canvas(el, { backgroundColor: '#09090b', scale: 2 })
     const pdf = new jsPDF({ unit: 'px', format: [canvas.width / 2, canvas.height / 2] })
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width / 2, canvas.height / 2)
+    pdf.addImage(
+      canvas.toDataURL('image/png'),
+      'PNG',
+      0,
+      0,
+      canvas.width / 2,
+      canvas.height / 2,
+    )
     pdf.save(`minhascontas-${mesAtivo}.pdf`)
+  }
+
+  const FAB_LABELS: Partial<Record<AbaAtiva, string>> = {
+    contas: 'Adicionar conta',
+    gastos: 'Novo lançamento',
+    bancos: 'Novo banco',
+    receber: 'Novo a receber',
+  }
+
+  function handleFAB() {
+    document.dispatchEvent(new CustomEvent(`fab-${abaAtiva}`))
   }
 
   return (
@@ -101,27 +130,77 @@ export function Dashboard({ userId }: { userId: string }) {
       <Header />
 
       <main
-        id="dashboard-content"
-        className="max-w-2xl mx-auto px-5 py-5 pb-28 flex flex-col gap-4"
+        id="tab-content"
+        className="max-w-2xl mx-auto px-5 py-5 pb-40 flex flex-col gap-4"
       >
-        <ResumoCards
-          resumo={resumo}
-          receita={mesInfo?.receita ?? 0}
-          semContas={contas.length === 0}
-          onEditReceita={() => setReceitaModalOpen(true)}
-        />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={abaAtiva}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.18 }}
+          >
+            {abaAtiva === 'home' && (
+              <HomeTab
+                resumo={resumo}
+                receita={mesInfo?.receita ?? 0}
+                contas={contas}
+                bancos={bancos}
+                totalSaldo={totalSaldo}
+                totalGastos={totalGastos}
+                totalEntradas={totalEntradas}
+                totalPendente={totalPendente}
+                gastosPorCategoria={gastosPorCategoria}
+                gastosPorDia={gastosPorDia}
+                onEditReceita={() => setReceitaModalOpen(true)}
+              />
+            )}
+            {abaAtiva === 'contas' && (
+              <ContasTab
+                contas={contas}
+                bancos={bancos}
+                onTogglePagoComBanco={togglePagoComBanco}
+                onDesfazerPagamento={desfazerPagamento}
+                onDelete={deleteConta}
+                onAdd={addConta}
+                onUpdate={updateConta}
+                onNavigateToBancos={() => setAbaAtiva('bancos')}
+              />
+            )}
+            {abaAtiva === 'gastos' && (
+              <GastosTab
+                transacoes={transacoes}
+                bancos={bancos}
+                onAdd={addTransacao}
+                onUpdate={updateTransacao}
+                onDelete={deleteTransacao}
+              />
+            )}
+            {abaAtiva === 'bancos' && (
+              <BancosTab
+                bancos={bancos}
+                onAdd={addBanco}
+                onUpdate={updateBanco}
+                onDelete={deleteBanco}
+              />
+            )}
+            {abaAtiva === 'receber' && (
+              <ReceberTab
+                recebiveis={recebiveis}
+                bancos={bancos}
+                onAdd={addRecebivel}
+                onUpdate={updateRecebivel}
+                onDelete={deleteRecebivel}
+                onMarcarRecebido={marcarRecebido}
+                onDesmarcarRecebido={desmarcarRecebido}
+                onNavigateToBancos={() => setAbaAtiva('bancos')}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
 
-        <BillList
-          contas={contas}
-          onTogglePago={togglePago}
-          onEdit={handleEdit}
-          onDelete={deleteConta}
-          onAdd={handleOpenNew}
-        />
-
-        {contas.length > 0 && <ChartsPizza contas={contas} />}
-
-        {contas.length > 0 && (
+        {abaAtiva === 'home' && contas.length > 0 && (
           <div className="flex justify-center py-2">
             <button
               onClick={exportarPDF}
@@ -137,50 +216,40 @@ export function Dashboard({ userId }: { userId: string }) {
         )}
       </main>
 
-      {/* FAB — pill centered, with fade gradient */}
-      <div
-        className="fixed bottom-0 inset-x-0 flex justify-center items-end pb-5 pt-16 pointer-events-none"
-        style={{
-          background: 'linear-gradient(to top, #09090b 55%, transparent)',
-          zIndex: 10,
-        }}
-      >
-        <motion.button
-          initial={{ scale: 0.85, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.25, type: 'spring', stiffness: 280, damping: 22 }}
-          onClick={handleOpenNew}
-          className="pointer-events-auto flex items-center gap-2 rounded-full text-[13px] font-semibold"
+      {abaAtiva !== 'home' && FAB_LABELS[abaAtiva] && (
+        <div
+          className="fixed bottom-16 inset-x-0 flex justify-center items-end pb-5 pt-16 pointer-events-none"
           style={{
-            background: '#ffffff',
-            color: '#09090b',
-            padding: '12px 26px',
-            letterSpacing: '-0.02em',
-            boxShadow: '0 2px 16px rgba(0,0,0,0.5)',
+            background: 'linear-gradient(to top, #09090b 55%, transparent)',
+            zIndex: 10,
           }}
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
         >
-          <span
+          <motion.button
+            initial={{ scale: 0.85, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.1, type: 'spring', stiffness: 280, damping: 22 }}
+            onClick={handleFAB}
+            className="pointer-events-auto flex items-center gap-2 rounded-full text-[13px] font-semibold"
             style={{
-              fontSize: 20,
-              fontWeight: 200,
-              lineHeight: 1,
-              marginTop: -1,
+              background: '#ffffff',
+              color: '#09090b',
+              padding: '12px 26px',
+              letterSpacing: '-0.02em',
+              boxShadow: '0 2px 16px rgba(0,0,0,0.5)',
             }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
           >
-            +
-          </span>
-          Adicionar conta
-        </motion.button>
-      </div>
+            <span style={{ fontSize: 20, fontWeight: 200, lineHeight: 1, marginTop: -1 }}>
+              +
+            </span>
+            {FAB_LABELS[abaAtiva]}
+          </motion.button>
+        </div>
+      )}
 
-      <BillModal
-        open={billModalOpen}
-        onClose={() => { setBillModalOpen(false); setEditando(null) }}
-        onSave={handleSaveBill}
-        editando={editando}
-      />
+      <BottomNav ativa={abaAtiva} onChange={setAbaAtiva} />
+
       <ReceitaModal
         open={receitaModalOpen}
         valorAtual={mesInfo?.receita ?? 0}
@@ -192,7 +261,10 @@ export function Dashboard({ userId }: { userId: string }) {
         mesOrigemId={mesOrigemId}
         mesDestinoId={mesAtivo}
         onCopiar={handleCopiarFixos}
-        onPular={handlePularCopia}
+        onPular={async () => {
+          await criarMes(mesAtivo, 0)
+          setCopiarModalOpen(false)
+        }}
       />
     </div>
   )
