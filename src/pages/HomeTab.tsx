@@ -1,5 +1,8 @@
 import { ResumoCards } from '@/components/Dashboard/ResumoCards'
 import { IndicadoresRapidos } from '@/components/Dashboard/IndicadoresRapidos'
+import { ChartsPizza } from '@/components/Charts/ChartsPizza'
+import { ChartsBarBancos } from '@/components/Charts/ChartsBarBancos'
+import { ChartsLinhaDia } from '@/components/Charts/ChartsLinhaDia'
 import { Conta, ResumoMes, BancoComSaldo, CategoriaGasto } from '@/types'
 
 interface Props {
@@ -20,12 +23,14 @@ export function HomeTab({
   resumo,
   receita,
   contas,
+  bancos,
   totalSaldo,
   totalGastos,
   totalEntradas,
   totalPendente,
+  gastosPorCategoria,
+  gastosPorDia,
   onEditReceita,
-  // gastosPorCategoria and gastosPorDia intentionally not destructured — used by charts in Task 14
 }: Props) {
   const fixasPagas = contas.filter(c => c.categoria === 'fixo' && c.pago).length
   const fixasTotal = contas.filter(c => c.categoria === 'fixo').length
@@ -47,6 +52,11 @@ export function HomeTab({
         fixasPagas={fixasPagas}
         fixasTotal={fixasTotal}
       />
+      {Object.keys(gastosPorCategoria).length > 0 && (
+        <ChartsPizza gastosPorCategoria={gastosPorCategoria} />
+      )}
+      <ChartsBarBancos bancos={bancos} />
+      <ChartsLinhaDia gastosPorDia={gastosPorDia} />
     </div>
   )
 }
