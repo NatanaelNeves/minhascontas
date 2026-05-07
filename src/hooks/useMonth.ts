@@ -10,6 +10,7 @@ import {
   deleteDoc,
   query,
   where,
+  writeBatch,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { ContaInput, MesInfo } from '@/types'
@@ -27,6 +28,7 @@ interface UseMonthReturn {
     conta: ContaInput,
     parcelaTotal: number,
     mesInicialId: string,
+    parcelaInicialAtual?: number,
   ) => Promise<void>
   excluirParcelamentosRestantes: (
     parcelamentoId: string,
@@ -112,13 +114,15 @@ export function useMonth(userId: string): UseMonthReturn {
     conta: ContaInput,
     parcelaTotal: number,
     mesInicialId: string,
+    parcelaInicialAtual = 1,
   ): Promise<void> {
     const parcelamentoId = crypto.randomUUID()
+    const batch = writeBatch(db)
     let currentMes = mesInicialId
 
-    for (let atual = 1; atual <= parcelaTotal; atual++) {
-      const destCol = collection(db, `users/${userId}/months/${currentMes}/bills`)
-      await addDoc(destCol, {
+    for (let atual = parcelaInicialAtual; atual <= parcelaTotal; atual++) {
+      const billRef = doc(collection(db, `users/${userId}/months/${currentMes}/bills`))
+      const payload: Record<string, unknown> = {
         nome: conta.nome,
         valor: conta.valor,
         categoria: conta.categoria,
@@ -128,9 +132,13 @@ export function useMonth(userId: string): UseMonthReturn {
         parcelas: { atual, total: parcelaTotal },
         parcelamentoId,
         criadoEm: serverTimestamp(),
-      })
+      }
+      if (conta.cartaoId) payload.cartaoId = conta.cartaoId
+      batch.set(billRef, payload)
       currentMes = nextMesId(currentMes)
     }
+
+    await batch.commit()
   }
 
   async function excluirParcelamentosRestantes(

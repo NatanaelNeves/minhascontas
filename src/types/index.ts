@@ -18,6 +18,7 @@ export interface Conta {
   pago: boolean
   parcelas: Parcelas | null
   parcelamentoId?: string
+  cartaoId?: string
   pagamento?: { data: string; bancoId: string }
   criadoEm: Date
 }

@@ -2,16 +2,18 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { Conta, ContaInput, Categoria, FormaPagamento } from '@/types'
+import { Conta, ContaInput, Categoria, FormaPagamento, Cartao } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { formatMesLabel, centavosToDisplay, valorToCentStr } from '@/lib/utils'
+import { formatMesLabel, centavosToDisplay, valorToCentStr, formatBRL } from '@/lib/utils'
 
 interface Props {
   open: boolean
   onClose: () => void
   onSave: (data: ContaInput) => void
-  onSaveParcelada?: (data: ContaInput, parcelaTotal: number) => void
+  onSaveParcelada?: (data: ContaInput, parcelaTotal: number, parcelaInicialAtual: number) => void
   editando?: Conta | null
+  cartoes: Cartao[]
+  onNavigateToCartoes?: () => void
 }
 
 const DEFAULT_FORM: ContaInput = {
@@ -37,18 +39,17 @@ const FORMAS: { value: FormaPagamento; label: string; icon: string }[] = [
   { value: 'credito', label: 'Crédito', icon: '🏦' },
 ]
 
+const TIPO_LABEL: Record<string, string> = {
+  credito: 'Crédito',
+  vale_alimentacao: 'Vale Alim.',
+  vale_combustivel: 'Vale Comb.',
+  vale_refeicao: 'Vale Ref.',
+  outros_beneficios: 'Benefício',
+}
+
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <p
-      style={{
-        fontSize: 10,
-        fontWeight: 600,
-        color: 'var(--text-tertiary)',
-        letterSpacing: '0.09em',
-        textTransform: 'uppercase',
-        marginBottom: 8,
-      }}
-    >
+    <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 8 }}>
       {children}
     </p>
   )
@@ -60,29 +61,18 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
       type="button"
       onClick={onToggle}
       style={{
-        width: 40,
-        height: 22,
-        borderRadius: 99,
+        width: 40, height: 22, borderRadius: 99,
         background: on ? 'var(--green)' : 'rgba(255,255,255,0.1)',
-        position: 'relative',
-        cursor: 'pointer',
-        border: 'none',
-        padding: 0,
-        flexShrink: 0,
-        transition: 'background .2s',
+        position: 'relative', cursor: 'pointer',
+        border: 'none', padding: 0, flexShrink: 0, transition: 'background .2s',
       }}
     >
       <motion.div
         animate={{ x: on ? 20 : 3 }}
         transition={{ type: 'spring', stiffness: 500, damping: 38 }}
         style={{
-          width: 16,
-          height: 16,
-          borderRadius: '50%',
-          background: '#fff',
-          position: 'absolute',
-          top: 3,
-          left: 0,
+          width: 16, height: 16, borderRadius: '50%', background: '#fff',
+          position: 'absolute', top: 3, left: 0,
           boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
         }}
       />
@@ -104,12 +94,20 @@ const baseInput = {
   letterSpacing: '-0.01em',
 } as const
 
-export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: Props) {
+export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, cartoes, onNavigateToCartoes }: Props) {
   const { mesAtivo } = useAppStore()
+
   const [form, setForm] = useState<ContaInput>(DEFAULT_FORM)
+  const [cartaoId, setCartaoId] = useState('')
+
+  // Main valor (when !temParcelas)
   const [centStr, setCentStr] = useState('')
+
+  // Parcelamento
   const [temParcelas, setTemParcelas] = useState(false)
+  const [valorTotalCentStr, setValorTotalCentStr] = useState('')
   const [parcelasTotal, setParcelasTotal] = useState(2)
+  const [parcelaAtual, setParcelaAtual] = useState(1)
 
   useEffect(() => {
     if (editando) {
@@ -122,14 +120,27 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
         pago: editando.pago,
         parcelas: editando.parcelas,
       })
+      setCartaoId(editando.cartaoId ?? '')
       setCentStr(valorToCentStr(editando.valor))
-      setTemParcelas(!!editando.parcelas)
-      setParcelasTotal(editando.parcelas?.total ?? 2)
+      const hasParcelas = !!editando.parcelas
+      setTemParcelas(hasParcelas)
+      if (hasParcelas && editando.parcelas) {
+        setParcelasTotal(editando.parcelas.total)
+        setParcelaAtual(editando.parcelas.atual)
+        setValorTotalCentStr(valorToCentStr(editando.valor * editando.parcelas.total))
+      } else {
+        setParcelasTotal(2)
+        setParcelaAtual(1)
+        setValorTotalCentStr('')
+      }
     } else {
       setForm(DEFAULT_FORM)
+      setCartaoId('')
       setCentStr('')
       setTemParcelas(false)
       setParcelasTotal(2)
+      setParcelaAtual(1)
+      setValorTotalCentStr('')
     }
   }, [editando, open])
 
@@ -141,32 +152,52 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
   }, [open, onClose])
 
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
+    document.body.style.overflow = open ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [open])
 
-  function getCents(): number { return parseInt(centStr || '0', 10) }
+  function getValorTotalCents(): number {
+    return parseInt(valorTotalCentStr || '0', 10)
+  }
+
+  function getParcelaCents(): number {
+    const total = getValorTotalCents()
+    return parcelasTotal > 0 ? Math.round(total / parcelasTotal) : 0
+  }
+
+  function getCents(): number {
+    return temParcelas ? getParcelaCents() : parseInt(centStr || '0', 10)
+  }
+
+  const valorTotalReais = getValorTotalCents() / 100
+  const valorParcelaReais = getParcelaCents() / 100
+  const divergencia = valorTotalCentStr && parcelasTotal > 0
+    ? Math.abs(valorTotalReais - valorParcelaReais * parcelasTotal) > valorTotalReais * 0.01
+    : false
 
   function handleSave() {
     if (!form.nome.trim() || getCents() <= 0) return
     const data: ContaInput = {
       ...form,
       valor: getCents() / 100,
-      parcelas: temParcelas ? { atual: 1, total: parcelasTotal } : null,
+      parcelas: temParcelas ? { atual: parcelaAtual, total: parcelasTotal } : null,
+      ...(cartaoId ? { cartaoId } : {}),
     }
     if (temParcelas && parcelasTotal > 1 && !editando && onSaveParcelada) {
-      onSaveParcelada(data, parcelasTotal)
+      onSaveParcelada(data, parcelasTotal, parcelaAtual)
     } else {
-      onSave({ ...data, parcelas: editando?.parcelas ?? (temParcelas ? { atual: 1, total: parcelasTotal } : null) })
+      const parcelas = editando?.parcelas ?? (temParcelas ? { atual: parcelaAtual, total: parcelasTotal } : null)
+      onSave({ ...data, parcelas })
     }
     onClose()
   }
 
-  const canSave = form.nome.trim().length > 0 && getCents() > 0
+  const canSave = (() => {
+    if (!form.nome.trim()) return false
+    if (getCents() <= 0) return false
+    if (form.categoria === 'cartao' && cartoes.length > 0 && !cartaoId) return false
+    return true
+  })()
 
   function focusInput(e: React.FocusEvent<HTMLInputElement>) {
     e.target.style.borderColor = 'var(--border-strong)'
@@ -181,7 +212,6 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
             key="backdrop"
             initial={{ opacity: 0 }}
@@ -190,16 +220,13 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
             transition={{ duration: 0.22 }}
             onClick={onClose}
             style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 50,
+              position: 'fixed', inset: 0, zIndex: 50,
               background: 'rgba(0,0,0,0.65)',
               backdropFilter: 'blur(6px)',
               WebkitBackdropFilter: 'blur(6px)',
             }}
           />
 
-          {/* Side sheet */}
           <motion.div
             key="sheet"
             initial={{ x: '100%' }}
@@ -207,67 +234,30 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             style={{
-              position: 'fixed',
-              top: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 51,
+              position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 51,
               width: 'min(420px, 100vw)',
               background: 'var(--bg-elevated)',
               borderLeft: '0.5px solid var(--border)',
-              display: 'flex',
-              flexDirection: 'column',
+              display: 'flex', flexDirection: 'column',
             }}
           >
-            {/* Sheet header */}
-            <div
-              style={{
-                padding: '18px 22px',
-                borderBottom: '0.5px solid var(--border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexShrink: 0,
-              }}
-            >
+            {/* Header */}
+            <div style={{ padding: '18px 22px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div>
-                <p
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    color: 'var(--text-tertiary)',
-                    letterSpacing: '0.09em',
-                    textTransform: 'uppercase',
-                    marginBottom: 3,
-                  }}
-                >
+                <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 3 }}>
                   {formatMesLabel(mesAtivo)}
                 </p>
-                <p
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 600,
-                    color: '#fff',
-                    letterSpacing: '-0.03em',
-                  }}
-                >
+                <p style={{ fontSize: 18, fontWeight: 600, color: '#fff', letterSpacing: '-0.03em' }}>
                   {editando ? 'Editar conta' : 'Nova conta'}
                 </p>
               </div>
               <button
                 onClick={onClose}
                 style={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: 8,
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--text-tertiary)',
-                  transition: 'background .15s',
+                  width: 30, height: 30, borderRadius: 8,
+                  background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--text-tertiary)', transition: 'background .15s',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-surface)')}
@@ -276,17 +266,8 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
               </button>
             </div>
 
-            {/* Sheet body */}
-            <div
-              style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '22px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 20,
-              }}
-            >
+            {/* Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '22px', display: 'flex', flexDirection: 'column', gap: 20 }}>
               {/* Nome */}
               <div>
                 <Label>Nome</Label>
@@ -301,73 +282,46 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
                 />
               </div>
 
-              {/* Valor */}
-              <div>
-                <Label>Valor</Label>
-                <div style={{ position: 'relative' }}>
-                  <span
-                    style={{
-                      position: 'absolute',
-                      left: 14,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      fontSize: 16,
-                      fontWeight: 600,
-                      color: 'var(--text-tertiary)',
-                      pointerEvents: 'none',
-                      letterSpacing: '-0.02em',
-                      userSelect: 'none',
-                    }}
-                  >
-                    R$
-                  </span>
-                  <input
-                    value={centavosToDisplay(centStr)}
-                    onChange={e => setCentStr(e.target.value.replace(/\D/g, ''))}
-                    placeholder="0,00"
-                    inputMode="numeric"
-                    style={{
-                      ...baseInput,
-                      paddingLeft: 46,
-                      fontSize: 30,
-                      fontWeight: 700,
-                      letterSpacing: '-0.05em',
-                      height: 62,
-                    }}
-                    onFocus={focusInput}
-                    onBlur={blurInput}
-                  />
+              {/* Valor — só quando !temParcelas */}
+              {!temParcelas && (
+                <div>
+                  <Label>Valor</Label>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{
+                      position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+                      fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)',
+                      pointerEvents: 'none', letterSpacing: '-0.02em', userSelect: 'none',
+                    }}>
+                      R$
+                    </span>
+                    <input
+                      value={centavosToDisplay(centStr)}
+                      onChange={e => setCentStr(e.target.value.replace(/\D/g, ''))}
+                      placeholder="0,00"
+                      inputMode="numeric"
+                      style={{ ...baseInput, paddingLeft: 46, fontSize: 30, fontWeight: 700, letterSpacing: '-0.05em', height: 62 }}
+                      onFocus={focusInput}
+                      onBlur={blurInput}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Categoria — segmented control */}
+              {/* Categoria */}
               <div>
                 <Label>Categoria</Label>
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: 3,
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 10,
-                    padding: 3,
-                  }}
-                >
+                <div style={{ display: 'flex', gap: 3, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 3 }}>
                   {CATEGORIAS.map(opt => (
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => setForm(f => ({ ...f, categoria: opt.value }))}
+                      onClick={() => {
+                        setForm(f => ({ ...f, categoria: opt.value }))
+                        if (opt.value !== 'cartao') setCartaoId('')
+                      }}
                       style={{
-                        flex: 1,
-                        padding: '8px 6px',
-                        borderRadius: 7,
-                        fontSize: 13,
-                        fontWeight: 500,
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        border: 'none',
-                        fontFamily: 'inherit',
+                        flex: 1, padding: '8px 6px', borderRadius: 7, fontSize: 13, fontWeight: 500,
+                        textAlign: 'center', cursor: 'pointer', border: 'none', fontFamily: 'inherit',
                         transition: 'all .15s',
                         background: form.categoria === opt.value ? 'var(--text-primary)' : 'transparent',
                         color: form.categoria === opt.value ? 'var(--bg-base)' : 'var(--text-secondary)',
@@ -380,7 +334,79 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
                 </div>
               </div>
 
-              {/* Forma de pagamento — chips arredondados */}
+              {/* Cartão picker — só quando categoria === 'cartao' */}
+              <AnimatePresence>
+                {form.categoria === 'cartao' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div>
+                      <Label>Qual cartão?</Label>
+                      {cartoes.length === 0 ? (
+                        <div style={{
+                          padding: '14px', borderRadius: 10,
+                          background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                        }}>
+                          <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                            Nenhum cartão cadastrado.
+                          </p>
+                          {onNavigateToCartoes && (
+                            <button
+                              type="button"
+                              onClick={() => { onClose(); onNavigateToCartoes() }}
+                              style={{
+                                padding: '6px 14px', borderRadius: 99, fontSize: 12, fontWeight: 600,
+                                background: 'var(--text-primary)', color: 'var(--bg-base)',
+                                border: 'none', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+                              }}
+                            >
+                              Ir para Cartões
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {cartoes.map(c => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => setCartaoId(c.id)}
+                              style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                padding: '11px 14px', borderRadius: 10,
+                                background: cartaoId === c.id ? 'var(--text-primary)' : 'var(--bg-surface)',
+                                border: cartaoId === c.id ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                                cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.cor, flexShrink: 0 }} />
+                                <span style={{ fontSize: 14, fontWeight: 500, color: cartaoId === c.id ? 'var(--bg-base)' : 'var(--text-primary)' }}>
+                                  {c.nome}
+                                </span>
+                              </div>
+                              <span style={{
+                                fontSize: 10, fontWeight: 500, padding: '2px 8px', borderRadius: 99,
+                                background: cartaoId === c.id ? 'rgba(0,0,0,0.15)' : 'var(--bg-elevated)',
+                                color: cartaoId === c.id ? 'var(--bg-base)' : 'var(--text-tertiary)',
+                                letterSpacing: '0.02em',
+                              }}>
+                                {TIPO_LABEL[c.tipo] ?? c.tipo}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Forma de pagamento */}
               <div>
                 <Label>Forma de pagamento</Label>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -392,19 +418,10 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
                         type="button"
                         onClick={() => setForm(f => ({ ...f, formaPagamento: opt.value }))}
                         style={{
-                          padding: '7px 14px',
-                          borderRadius: 99,
-                          fontSize: 13,
-                          fontWeight: 500,
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          transition: 'all .15s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 5,
-                          border: selected
-                            ? '1px solid var(--text-primary)'
-                            : '1px solid var(--border)',
+                          padding: '7px 14px', borderRadius: 99, fontSize: 13, fontWeight: 500,
+                          cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          border: selected ? '1px solid var(--text-primary)' : '1px solid var(--border)',
                           background: selected ? 'var(--text-primary)' : 'var(--bg-surface)',
                           color: selected ? 'var(--bg-base)' : 'var(--text-secondary)',
                           letterSpacing: '-0.01em',
@@ -425,28 +442,18 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
                   type="date"
                   value={form.vencimento ?? ''}
                   onChange={e => setForm(f => ({ ...f, vencimento: e.target.value || null }))}
-                  style={{
-                    ...baseInput,
-                    color: form.vencimento ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                    colorScheme: 'dark',
-                  }}
+                  style={{ ...baseInput, color: form.vencimento ? 'var(--text-primary)' : 'var(--text-tertiary)', colorScheme: 'dark' }}
                   onFocus={focusInput}
                   onBlur={blurInput}
                 />
               </div>
 
               {/* Parcelado — toggle */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 14px',
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 10,
-                }}
-              >
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '12px 14px', background: 'var(--bg-surface)',
+                border: '1px solid var(--border)', borderRadius: 10,
+              }}>
                 <div>
                   <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
                     Parcelado
@@ -466,36 +473,87 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
                     exit={{ opacity: 0, height: 0 }}
                     style={{ overflow: 'hidden' }}
                   >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {/* Valor total */}
                       <div>
-                        <Label>Número de parcelas</Label>
-                        <input
-                          type="number"
-                          min={2}
-                          max={120}
-                          value={parcelasTotal}
-                          onChange={e => setParcelasTotal(Math.max(2, Number(e.target.value)))}
-                          style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
-                        />
+                        <Label>Valor total do bem</Label>
+                        <div style={{ position: 'relative' }}>
+                          <span style={{
+                            position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+                            fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)',
+                            pointerEvents: 'none', userSelect: 'none',
+                          }}>
+                            R$
+                          </span>
+                          <input
+                            value={centavosToDisplay(valorTotalCentStr)}
+                            onChange={e => setValorTotalCentStr(e.target.value.replace(/\D/g, ''))}
+                            placeholder="0,00"
+                            inputMode="numeric"
+                            style={{ ...baseInput, paddingLeft: 46, fontSize: 28, fontWeight: 700, letterSpacing: '-0.05em', height: 58 }}
+                            onFocus={focusInput}
+                            onBlur={blurInput}
+                          />
+                        </div>
                       </div>
-                      {getCents() > 0 && parcelasTotal >= 2 && (
-                        <div
-                          style={{
-                            padding: '10px 14px', borderRadius: 10,
-                            background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                          }}
-                        >
-                          <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 2 }}>
-                            Total do parcelamento
+
+                      {/* Número de parcelas + parcela atual — lado a lado */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div>
+                          <Label>Nº de parcelas</Label>
+                          <input
+                            type="number"
+                            min={2}
+                            max={120}
+                            value={parcelasTotal}
+                            onChange={e => setParcelasTotal(Math.max(2, Number(e.target.value)))}
+                            style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
+                          />
+                        </div>
+                        <div>
+                          <Label>Parcela atual</Label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={parcelasTotal}
+                            value={parcelaAtual}
+                            onChange={e => setParcelaAtual(Math.min(parcelasTotal, Math.max(1, Number(e.target.value))))}
+                            style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Valor de cada parcela — read-only */}
+                      {getValorTotalCents() > 0 && parcelasTotal >= 2 && (
+                        <div style={{
+                          padding: '12px 14px', borderRadius: 10,
+                          background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        }}>
+                          <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+                            Valor de cada parcela
                           </p>
-                          <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((getCents() / 100) * parcelasTotal)}
+                          <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>
+                            {formatBRL(valorParcelaReais)}
                           </p>
                         </div>
                       )}
+
+                      {/* Divergência */}
+                      {divergencia && (
+                        <div style={{
+                          padding: '10px 14px', borderRadius: 10,
+                          background: 'var(--amber-muted)', border: '1px solid rgba(245,158,11,0.25)',
+                        }}>
+                          <p style={{ fontSize: 12, color: 'var(--amber)', lineHeight: 1.4 }}>
+                            Atenção: valor total ÷ parcelas ≠ valor da parcela (diferença de centavos por arredondamento)
+                          </p>
+                        </div>
+                      )}
+
                       {!editando && (
                         <p style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
-                          As {parcelasTotal} parcelas serão criadas automaticamente nos próximos meses.
+                          {parcelasTotal - parcelaAtual + 1} parcelas serão criadas automaticamente a partir do mês atual.
                         </p>
                       )}
                     </div>
@@ -504,17 +562,11 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
               </AnimatePresence>
 
               {/* Pago — toggle */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 14px',
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 10,
-                }}
-              >
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '12px 14px', background: 'var(--bg-surface)',
+                border: '1px solid var(--border)', borderRadius: 10,
+              }}>
                 <div>
                   <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
                     Já foi pago
@@ -527,31 +579,15 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
               </div>
             </div>
 
-            {/* Sheet footer */}
-            <div
-              style={{
-                padding: '14px 22px',
-                borderTop: '0.5px solid var(--border)',
-                display: 'flex',
-                gap: 8,
-                flexShrink: 0,
-              }}
-            >
+            {/* Footer */}
+            <div style={{ padding: '14px 22px', borderTop: '0.5px solid var(--border)', display: 'flex', gap: 8, flexShrink: 0 }}>
               <button
                 onClick={onClose}
                 style={{
-                  flex: 1,
-                  padding: '12px',
-                  borderRadius: 10,
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-secondary)',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  letterSpacing: '-0.01em',
-                  transition: 'color .15s',
+                  flex: 1, padding: '12px', borderRadius: 10,
+                  background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                  color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500,
+                  fontFamily: 'inherit', cursor: 'pointer', letterSpacing: '-0.01em', transition: 'color .15s',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
@@ -562,18 +598,13 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: 
                 onClick={handleSave}
                 disabled={!canSave}
                 style={{
-                  flex: 2,
-                  padding: '12px',
-                  borderRadius: 10,
+                  flex: 2, padding: '12px', borderRadius: 10,
                   background: canSave ? 'var(--text-primary)' : 'rgba(255,255,255,0.06)',
                   border: 'none',
                   color: canSave ? 'var(--bg-base)' : 'var(--text-tertiary)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  fontFamily: 'inherit',
-                  cursor: canSave ? 'pointer' : 'not-allowed',
-                  transition: 'all .2s',
-                  letterSpacing: '-0.01em',
+                  fontSize: 13, fontWeight: 600,
+                  fontFamily: 'inherit', cursor: canSave ? 'pointer' : 'not-allowed',
+                  transition: 'all .2s', letterSpacing: '-0.01em',
                 }}
               >
                 {editando ? 'Salvar alterações' : 'Adicionar conta'}

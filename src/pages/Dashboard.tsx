@@ -44,6 +44,7 @@ export function Dashboard({ userId }: { userId: string }) {
     addConta,
     updateConta,
     deleteConta,
+    togglePago,
     togglePagoComBanco,
     desfazerPagamento,
   } = useBills(userId, mesAtivo, mesInfo?.receita ?? 0)
@@ -79,14 +80,18 @@ export function Dashboard({ userId }: { userId: string }) {
 
   const cartoesComSaldo = useMemo<CartaoComSaldo[]>(() => {
     return cartoes.map(cartao => {
-      const totalUsado = transacoes
+      const totalDeTx = transacoes
         .filter(t => t.cartaoId === cartao.id && t.tipo === 'gasto')
         .reduce((sum, t) => sum + t.valor, 0)
+      const totalDeContas = contas
+        .filter(c => c.cartaoId === cartao.id && c.pago)
+        .reduce((sum, c) => sum + c.valor, 0)
+      const totalUsado = totalDeTx + totalDeContas
       const limiteDisponivel = cartao.limite - totalUsado
       const percentualUsado = cartao.limite > 0 ? (totalUsado / cartao.limite) * 100 : 0
       return { ...cartao, totalUsado, limiteDisponivel, percentualUsado }
     })
-  }, [cartoes, transacoes])
+  }, [cartoes, transacoes, contas])
 
   const autoFaturaRef = useRef<Set<string>>(new Set())
 
@@ -147,8 +152,8 @@ export function Dashboard({ userId }: { userId: string }) {
     })
   }, [transacoes, recebiveis, userId, mesAtivo])
 
-  async function handleSaveParcelada(data: ContaInput, parcelaTotal: number) {
-    await criarContaComParcelas(data, parcelaTotal, mesAtivo)
+  async function handleSaveParcelada(data: ContaInput, parcelaTotal: number, parcelaInicialAtual: number) {
+    await criarContaComParcelas(data, parcelaTotal, mesAtivo, parcelaInicialAtual)
   }
 
   async function handleDeleteParcelamento(
@@ -236,6 +241,7 @@ export function Dashboard({ userId }: { userId: string }) {
                 bancos={bancos}
                 faturas={faturas}
                 cartoes={cartoes}
+                onTogglePago={togglePago}
                 onTogglePagoComBanco={togglePagoComBanco}
                 onDesfazerPagamento={desfazerPagamento}
                 onDelete={deleteConta}
@@ -244,6 +250,7 @@ export function Dashboard({ userId }: { userId: string }) {
                 onSaveParcelada={handleSaveParcelada}
                 onDeleteParcelamento={handleDeleteParcelamento}
                 onNavigateToBancos={() => setAbaAtiva('bancos')}
+                onNavigateToCartoes={() => setAbaAtiva('cartoes')}
                 onMarcarFaturaPaga={marcarFaturaPaga}
                 onDesmarcarFaturaPaga={desmarcarFaturaPaga}
               />

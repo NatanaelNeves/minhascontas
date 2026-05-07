@@ -11,6 +11,7 @@ interface Props {
   bancos: BancoComSaldo[]
   faturas: FaturaCartao[]
   cartoes: Cartao[]
+  onTogglePago: (id: string, pago: boolean) => Promise<void>
   onTogglePagoComBanco: (
     id: string,
     bancoId: string,
@@ -21,9 +22,10 @@ interface Props {
   onDelete: (id: string) => Promise<void>
   onAdd: (data: ContaInput) => Promise<void>
   onUpdate: (id: string, data: Partial<ContaInput>) => Promise<void>
-  onSaveParcelada?: (data: ContaInput, parcelaTotal: number) => Promise<void>
+  onSaveParcelada?: (data: ContaInput, parcelaTotal: number, parcelaInicialAtual: number) => Promise<void>
   onDeleteParcelamento?: (parcelamentoId: string, parcelaAtualFrom: number, parcelaTotal: number) => Promise<void>
   onNavigateToBancos: () => void
+  onNavigateToCartoes: () => void
   onMarcarFaturaPaga: (faturaId: string, bancoId: string) => Promise<void>
   onDesmarcarFaturaPaga: (faturaId: string) => Promise<void>
 }
@@ -33,6 +35,7 @@ export function ContasTab({
   bancos,
   faturas,
   cartoes,
+  onTogglePago,
   onTogglePagoComBanco,
   onDesfazerPagamento,
   onDelete,
@@ -41,6 +44,7 @@ export function ContasTab({
   onSaveParcelada,
   onDeleteParcelamento,
   onNavigateToBancos,
+  onNavigateToCartoes,
   onMarcarFaturaPaga,
   onDesmarcarFaturaPaga,
 }: Props) {
@@ -59,8 +63,19 @@ export function ContasTab({
 
   function handleToggle(id: string, pago: boolean) {
     if (pago) {
+      // Currently paid → undo
       onDesfazerPagamento(id)
     } else {
+      // Currently unpaid → pay
+      const conta = contas.find(c => c.id === id)
+      if (conta?.cartaoId) {
+        const cartao = cartoes.find(c => c.id === conta.cartaoId)
+        if (cartao && cartao.tipo !== 'credito') {
+          // Benefit card → mark paid directly, no bank deduction
+          onTogglePago(id, true)
+          return
+        }
+      }
       setPendingToggleId(id)
     }
   }
@@ -212,6 +227,8 @@ export function ContasTab({
         onSave={handleSave}
         onSaveParcelada={editando ? undefined : onSaveParcelada}
         editando={editando}
+        cartoes={cartoes}
+        onNavigateToCartoes={onNavigateToCartoes}
       />
 
       <PagarContaModal
