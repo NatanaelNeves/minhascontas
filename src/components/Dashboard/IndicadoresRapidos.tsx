@@ -44,8 +44,6 @@ export function IndicadoresRapidos({
   fixasPagas,
   fixasTotal,
 }: Props) {
-  const saldoReal = totalSaldo + totalPendente
-
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -59,24 +57,6 @@ export function IndicadoresRapidos({
           value={`${fixasPagas} de ${fixasTotal}`}
           color={fixasPagas === fixasTotal && fixasTotal > 0 ? 'var(--green)' : 'var(--text-primary)'}
         />
-      </div>
-
-      <div
-        className="rounded-xl px-4 py-3 flex items-center justify-between"
-        style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
-      >
-        <span
-          className="text-xs uppercase tracking-wide"
-          style={{ color: 'var(--text-tertiary)' }}
-        >
-          Saldo Real (incl. A Receber)
-        </span>
-        <span
-          className="text-lg font-bold tracking-tight"
-          style={{ color: saldoReal >= 0 ? 'var(--green)' : 'var(--red)' }}
-        >
-          {formatBRL(saldoReal)}
-        </span>
       </div>
     </div>
   )
