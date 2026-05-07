@@ -1,4 +1,4 @@
-import { writeBatch, doc, serverTimestamp } from 'firebase/firestore'
+import { writeBatch, doc, serverTimestamp, deleteField } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useFirestore } from './useFirestore'
 import { calcResumo } from '@/lib/utils'
@@ -16,6 +16,7 @@ interface UseBillsReturn {
     id: string,
     bancoId: string,
     contaData: { nome: string; valor: number; vencimento: string | null },
+    dataPagamento: string,
   ) => Promise<void>
   desfazerPagamento: (id: string) => Promise<void>
 }
@@ -41,17 +42,20 @@ export function useBills(
     id: string,
     bancoId: string,
     contaData: { nome: string; valor: number; vencimento: string | null },
+    dataPagamento: string,
   ) {
-    const hoje = new Date().toISOString().split('T')[0]
     const batch = writeBatch(db)
-    batch.update(doc(db, billPath, id), { pago: true })
+    batch.update(doc(db, billPath, id), {
+      pago: true,
+      pagamento: { data: dataPagamento, bancoId },
+    })
     batch.set(doc(db, txPath, `bill_${id}`), {
       tipo: 'gasto',
       categoria: 'despesaFixa',
       bancoId,
       valor: contaData.valor,
       descricao: contaData.nome,
-      data: contaData.vencimento ?? hoje,
+      data: dataPagamento,
       despesaFixa: true,
       origem: { tipo: 'bill', id },
       criadoEm: serverTimestamp(),
@@ -61,7 +65,7 @@ export function useBills(
 
   async function desfazerPagamento(id: string) {
     const batch = writeBatch(db)
-    batch.update(doc(db, billPath, id), { pago: false })
+    batch.update(doc(db, billPath, id), { pago: false, pagamento: deleteField() })
     batch.delete(doc(db, txPath, `bill_${id}`))
     await batch.commit()
   }
