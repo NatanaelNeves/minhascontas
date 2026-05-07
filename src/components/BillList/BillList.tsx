@@ -8,6 +8,7 @@ interface Props {
   onTogglePago: (id: string, pago: boolean) => void
   onEdit: (conta: Conta) => void
   onDelete: (id: string) => void
+  onDeleteParcelamento?: (parcelamentoId: string, parcelaAtualFrom: number, parcelaTotal: number) => void
   onAdd: () => void
 }
 
@@ -17,7 +18,17 @@ const CATEGORIAS = [
   { key: 'extra' as const, label: 'Extras do mês' },
 ]
 
-export function BillList({ contas, onTogglePago, onEdit, onDelete, onAdd }: Props) {
+function sortContas(contas: Conta[]): Conta[] {
+  return [...contas].sort((a, b) => {
+    if (a.pago !== b.pago) return a.pago ? 1 : -1
+    if (!a.vencimento && !b.vencimento) return 0
+    if (!a.vencimento) return 1
+    if (!b.vencimento) return -1
+    return a.vencimento.localeCompare(b.vencimento)
+  })
+}
+
+export function BillList({ contas, onTogglePago, onEdit, onDelete, onDeleteParcelamento, onAdd }: Props) {
   if (contas.length === 0) {
     return (
       <motion.div
@@ -54,7 +65,7 @@ export function BillList({ contas, onTogglePago, onEdit, onDelete, onAdd }: Prop
   return (
     <div className="space-y-4">
       {CATEGORIAS.map(({ key, label }) => {
-        const grupo = contas.filter(c => c.categoria === key)
+        const grupo = sortContas(contas.filter(c => c.categoria === key))
         if (grupo.length === 0) return null
 
         const totalGrupo = grupo.reduce((sum, c) => sum + c.valor, 0)
@@ -102,6 +113,7 @@ export function BillList({ contas, onTogglePago, onEdit, onDelete, onAdd }: Prop
                     onTogglePago={onTogglePago}
                     onEdit={onEdit}
                     onDelete={onDelete}
+                    onDeleteParcelamento={onDeleteParcelamento}
                   />
                 ))}
               </AnimatePresence>
