@@ -68,7 +68,10 @@ export function useReceivables(userId: string, mesId: string): UseReceivablesRet
   }
 
   async function deleteRecebivel(id: string) {
-    await deleteDoc(doc(db, recPath, id))
+    const batch = writeBatch(db)
+    batch.delete(doc(db, recPath, id))
+    batch.delete(doc(db, txPath, `receivable_${id}`))
+    await batch.commit()
   }
 
   async function marcarRecebido(id: string, bancoId: string) {

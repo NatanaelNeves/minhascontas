@@ -40,7 +40,6 @@ const METRICS = (resumo: ResumoMes) => [
   { label: 'Total', value: resumo.totalGeral, color: 'var(--text-primary)' },
   { label: 'Pago', value: resumo.totalPago, color: 'var(--green)' },
   { label: 'Pendente', value: resumo.totalPendente, color: 'var(--amber)' },
-  { label: 'Sobra', value: resumo.sobra, color: 'var(--purple)' },
 ]
 
 export function ResumoCards({ resumo, receita, semContas, onEditReceita }: Props) {
@@ -57,7 +56,7 @@ export function ResumoCards({ resumo, receita, semContas, onEditReceita }: Props
         border: '0.5px solid var(--border)',
       }}
     >
-      {/* Receita */}
+      {/* Hero: Sobra + health badge */}
       <div
         style={{
           padding: '20px 22px',
@@ -70,20 +69,21 @@ export function ResumoCards({ resumo, receita, semContas, onEditReceita }: Props
               className="text-[10px] font-semibold uppercase mb-1.5"
               style={{ color: 'var(--text-tertiary)', letterSpacing: '0.1em' }}
             >
-              Receita do mês
+              Sobra do mês
             </p>
             <p
               className="leading-none tabular-nums"
               style={{
                 fontSize: 34,
                 fontWeight: 700,
-                color: '#ffffff',
+                color: resumo.sobra >= 0 ? 'var(--green)' : 'var(--red)',
                 letterSpacing: '-0.05em',
                 fontVariantNumeric: 'tabular-nums',
               }}
             >
-              {receita > 0 ? formatBRL(receita) : '—'}
+              {semContas ? '—' : formatBRL(resumo.sobra)}
             </p>
+            {/* Receita secundária com edit */}
             <button
               onClick={onEditReceita}
               className="mt-2 flex items-center gap-1 transition-colors"
@@ -95,7 +95,7 @@ export function ResumoCards({ resumo, receita, semContas, onEditReceita }: Props
                 <path d="M1.5 8.5h7M6.5 1.5L8.5 3.5 4 8 2 8.5l.5-2 4-4z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.01em' }}>
-                {receita > 0 ? 'Editar receita' : 'Definir receita'}
+                Receita: {receita > 0 ? formatBRL(receita) : 'não definida'}
               </span>
             </button>
           </div>
@@ -157,8 +157,8 @@ export function ResumoCards({ resumo, receita, semContas, onEditReceita }: Props
         </div>
       )}
 
-      {/* 4 metrics — horizontal strip with dividers */}
-      <div className="grid grid-cols-4">
+      {/* 3 metrics — horizontal strip with dividers */}
+      <div className="grid grid-cols-3">
         {METRICS(resumo).map(({ label, value, color }, i) => (
           <div
             key={label}
