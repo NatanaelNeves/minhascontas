@@ -4,12 +4,13 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { Conta, ContaInput, Categoria, FormaPagamento } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { formatMesLabel } from '@/lib/utils'
+import { formatMesLabel, centavosToDisplay, valorToCentStr } from '@/lib/utils'
 
 interface Props {
   open: boolean
   onClose: () => void
   onSave: (data: ContaInput) => void
+  onSaveParcelada?: (data: ContaInput, parcelaTotal: number) => void
   editando?: Conta | null
 }
 
@@ -103,11 +104,12 @@ const baseInput = {
   letterSpacing: '-0.01em',
 } as const
 
-export function BillModal({ open, onClose, onSave, editando }: Props) {
+export function BillModal({ open, onClose, onSave, onSaveParcelada, editando }: Props) {
   const { mesAtivo } = useAppStore()
   const [form, setForm] = useState<ContaInput>(DEFAULT_FORM)
-  const [valorStr, setValorStr] = useState('')
+  const [centStr, setCentStr] = useState('')
   const [temParcelas, setTemParcelas] = useState(false)
+  const [parcelasTotal, setParcelasTotal] = useState(2)
 
   useEffect(() => {
     if (editando) {
@@ -120,12 +122,14 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
         pago: editando.pago,
         parcelas: editando.parcelas,
       })
-      setValorStr(editando.valor.toFixed(2).replace('.', ','))
+      setCentStr(valorToCentStr(editando.valor))
       setTemParcelas(!!editando.parcelas)
+      setParcelasTotal(editando.parcelas?.total ?? 2)
     } else {
       setForm(DEFAULT_FORM)
-      setValorStr('')
+      setCentStr('')
       setTemParcelas(false)
+      setParcelasTotal(2)
     }
   }, [editando, open])
 
@@ -145,21 +149,24 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
     return () => { document.body.style.overflow = '' }
   }, [open])
 
-  function parseValor(str: string): number {
-    return parseFloat(str.replace(',', '.')) || 0
-  }
+  function getCents(): number { return parseInt(centStr || '0', 10) }
 
   function handleSave() {
-    if (!form.nome.trim() || parseValor(valorStr) <= 0) return
-    onSave({
+    if (!form.nome.trim() || getCents() <= 0) return
+    const data: ContaInput = {
       ...form,
-      valor: parseValor(valorStr),
-      parcelas: temParcelas && form.parcelas ? form.parcelas : null,
-    })
+      valor: getCents() / 100,
+      parcelas: temParcelas ? { atual: 1, total: parcelasTotal } : null,
+    }
+    if (temParcelas && parcelasTotal > 1 && !editando && onSaveParcelada) {
+      onSaveParcelada(data, parcelasTotal)
+    } else {
+      onSave({ ...data, parcelas: editando?.parcelas ?? (temParcelas ? { atual: 1, total: parcelasTotal } : null) })
+    }
     onClose()
   }
 
-  const canSave = form.nome.trim().length > 0 && parseValor(valorStr) > 0
+  const canSave = form.nome.trim().length > 0 && getCents() > 0
 
   function focusInput(e: React.FocusEvent<HTMLInputElement>) {
     e.target.style.borderColor = 'var(--border-strong)'
@@ -315,10 +322,10 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                     R$
                   </span>
                   <input
-                    value={valorStr}
-                    onChange={e => setValorStr(e.target.value)}
+                    value={centavosToDisplay(centStr)}
+                    onChange={e => setCentStr(e.target.value.replace(/\D/g, ''))}
                     placeholder="0,00"
-                    inputMode="decimal"
+                    inputMode="numeric"
                     style={{
                       ...baseInput,
                       paddingLeft: 46,
@@ -457,37 +464,40 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    style={{ display: 'flex', gap: 12, overflow: 'hidden' }}
+                    style={{ overflow: 'hidden' }}
                   >
-                    <div style={{ flex: 1 }}>
-                      <Label>Parcela atual</Label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={form.parcelas?.atual ?? 1}
-                        onChange={e =>
-                          setForm(f => ({
-                            ...f,
-                            parcelas: { atual: Number(e.target.value), total: f.parcelas?.total ?? 1 },
-                          }))
-                        }
-                        style={{ ...baseInput, textAlign: 'center', fontSize: 18, fontWeight: 600 }}
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <Label>Total</Label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={form.parcelas?.total ?? 1}
-                        onChange={e =>
-                          setForm(f => ({
-                            ...f,
-                            parcelas: { atual: f.parcelas?.atual ?? 1, total: Number(e.target.value) },
-                          }))
-                        }
-                        style={{ ...baseInput, textAlign: 'center', fontSize: 18, fontWeight: 600 }}
-                      />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div>
+                        <Label>Número de parcelas</Label>
+                        <input
+                          type="number"
+                          min={2}
+                          max={120}
+                          value={parcelasTotal}
+                          onChange={e => setParcelasTotal(Math.max(2, Number(e.target.value)))}
+                          style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
+                        />
+                      </div>
+                      {getCents() > 0 && parcelasTotal >= 2 && (
+                        <div
+                          style={{
+                            padding: '10px 14px', borderRadius: 10,
+                            background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                          }}
+                        >
+                          <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 2 }}>
+                            Total do parcelamento
+                          </p>
+                          <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((getCents() / 100) * parcelasTotal)}
+                          </p>
+                        </div>
+                      )}
+                      {!editando && (
+                        <p style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
+                          As {parcelasTotal} parcelas serão criadas automaticamente nos próximos meses.
+                        </p>
+                      )}
                     </div>
                   </motion.div>
                 )}
