@@ -7,9 +7,13 @@ import {
   getDocs,
   serverTimestamp,
   addDoc,
+  deleteDoc,
+  query,
+  where,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { MesInfo } from '@/types'
+import { ContaInput, MesInfo } from '@/types'
+import { nextMesId } from '@/lib/utils'
 import { useAppStore } from '@/store/useAppStore'
 
 interface UseMonthReturn {
@@ -19,6 +23,17 @@ interface UseMonthReturn {
   criarMes: (mesId: string, receita: number) => Promise<void>
   copiarFixos: (mesOrigemId: string, mesDestinoId: string) => Promise<void>
   mesExiste: (mesId: string) => Promise<boolean>
+  criarContaComParcelas: (
+    conta: ContaInput,
+    parcelaTotal: number,
+    mesInicialId: string,
+  ) => Promise<void>
+  excluirParcelamentosRestantes: (
+    parcelamentoId: string,
+    parcelaAtualFrom: number,
+    parcelaTotal: number,
+    mesAtualId: string,
+  ) => Promise<void>
 }
 
 export function useMonth(userId: string): UseMonthReturn {
@@ -73,6 +88,7 @@ export function useMonth(userId: string): UseMonthReturn {
     for (const docSnap of snap.docs) {
       const data = docSnap.data()
       if (data.categoria !== 'fixo') continue
+      if (data.parcelamentoId) continue   // already pre-created, skip
       if (data.parcelas && data.parcelas.atual >= data.parcelas.total) continue
 
       const novaParcelas = data.parcelas
@@ -92,5 +108,50 @@ export function useMonth(userId: string): UseMonthReturn {
     }
   }
 
-  return { mesInfo, isLoading, setReceita, criarMes, copiarFixos, mesExiste }
+  async function criarContaComParcelas(
+    conta: ContaInput,
+    parcelaTotal: number,
+    mesInicialId: string,
+  ): Promise<void> {
+    const parcelamentoId = crypto.randomUUID()
+    let currentMes = mesInicialId
+
+    for (let atual = 1; atual <= parcelaTotal; atual++) {
+      const destCol = collection(db, `users/${userId}/months/${currentMes}/bills`)
+      await addDoc(destCol, {
+        nome: conta.nome,
+        valor: conta.valor,
+        categoria: conta.categoria,
+        formaPagamento: conta.formaPagamento,
+        vencimento: conta.vencimento ?? null,
+        pago: false,
+        parcelas: { atual, total: parcelaTotal },
+        parcelamentoId,
+        criadoEm: serverTimestamp(),
+      })
+      currentMes = nextMesId(currentMes)
+    }
+  }
+
+  async function excluirParcelamentosRestantes(
+    parcelamentoId: string,
+    parcelaAtualFrom: number,
+    parcelaTotal: number,
+    mesAtualId: string,
+  ): Promise<void> {
+    let currentMes = mesAtualId
+
+    for (let i = parcelaAtualFrom; i <= parcelaTotal; i++) {
+      const billsCol = collection(db, `users/${userId}/months/${currentMes}/bills`)
+      const snap = await getDocs(
+        query(billsCol, where('parcelamentoId', '==', parcelamentoId)),
+      )
+      for (const docSnap of snap.docs) {
+        await deleteDoc(docSnap.ref)
+      }
+      currentMes = nextMesId(currentMes)
+    }
+  }
+
+  return { mesInfo, isLoading, setReceita, criarMes, copiarFixos, mesExiste, criarContaComParcelas, excluirParcelamentosRestantes }
 }
