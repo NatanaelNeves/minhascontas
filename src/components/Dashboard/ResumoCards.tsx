@@ -12,35 +12,35 @@ interface Props {
 const SAUDE = {
   verde: {
     label: 'Mês tranquilo',
-    bg: 'rgba(16,185,129,0.1)',
-    border: 'rgba(16,185,129,0.25)',
-    dot: '#10B981',
+    bg: 'var(--green-muted)',
+    border: 'rgba(52,199,123,0.25)',
+    dot: 'var(--green)',
     dotClass: 'pulse-dot',
-    text: '#10B981',
+    text: 'var(--green)',
   },
   amarelo: {
     label: 'Atenção',
-    bg: 'rgba(245,158,11,0.1)',
+    bg: 'var(--amber-muted)',
     border: 'rgba(245,158,11,0.25)',
-    dot: '#F59E0B',
+    dot: 'var(--amber)',
     dotClass: 'pulse-dot-amber',
-    text: '#F59E0B',
+    text: 'var(--amber)',
   },
   vermelho: {
     label: 'Mês crítico',
-    bg: 'rgba(239,68,68,0.1)',
+    bg: 'var(--red-muted)',
     border: 'rgba(239,68,68,0.25)',
-    dot: '#EF4444',
+    dot: 'var(--red)',
     dotClass: 'pulse-dot-red',
-    text: '#EF4444',
+    text: 'var(--red)',
   },
 }
 
 const METRICS = (resumo: ResumoMes) => [
-  { label: 'Total', value: resumo.totalGeral, color: '#ffffff' },
-  { label: 'Pago', value: resumo.totalPago, color: '#10B981' },
-  { label: 'Pendente', value: resumo.totalPendente, color: '#F59E0B' },
-  { label: 'Sobra', value: resumo.sobra, color: '#7C72D8' },
+  { label: 'Total', value: resumo.totalGeral, color: 'var(--text-primary)' },
+  { label: 'Pago', value: resumo.totalPago, color: 'var(--green)' },
+  { label: 'Pendente', value: resumo.totalPendente, color: 'var(--amber)' },
+  { label: 'Sobra', value: resumo.sobra, color: 'var(--purple)' },
 ]
 
 export function ResumoCards({ resumo, receita, semContas, onEditReceita }: Props) {
@@ -53,8 +53,8 @@ export function ResumoCards({ resumo, receita, semContas, onEditReceita }: Props
       transition={{ duration: 0.35 }}
       className="rounded-[16px] overflow-hidden"
       style={{
-        background: 'var(--surface)',
-        border: '0.5px solid var(--border-subtle)',
+        background: 'var(--bg-surface)',
+        border: '0.5px solid var(--border)',
       }}
     >
       {/* Receita */}
@@ -68,7 +68,7 @@ export function ResumoCards({ resumo, receita, semContas, onEditReceita }: Props
           <div>
             <p
               className="text-[10px] font-semibold uppercase mb-1.5"
-              style={{ color: 'var(--text-subtle)', letterSpacing: '0.1em' }}
+              style={{ color: 'var(--text-tertiary)', letterSpacing: '0.1em' }}
             >
               Receita do mês
             </p>
@@ -87,9 +87,9 @@ export function ResumoCards({ resumo, receita, semContas, onEditReceita }: Props
             <button
               onClick={onEditReceita}
               className="mt-2 flex items-center gap-1 transition-colors"
-              style={{ color: 'var(--text-subtle)' }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-muted)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-subtle)')}
+              style={{ color: 'var(--text-tertiary)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                 <path d="M1.5 8.5h7M6.5 1.5L8.5 3.5 4 8 2 8.5l.5-2 4-4z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
@@ -131,13 +131,13 @@ export function ResumoCards({ resumo, receita, semContas, onEditReceita }: Props
           <div className="flex items-center justify-between mb-2">
             <p
               className="text-[10px] font-semibold uppercase"
-              style={{ color: 'var(--text-subtle)', letterSpacing: '0.08em' }}
+              style={{ color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}
             >
               Progresso
             </p>
             <p
               className="text-[12px] font-medium tabular-nums"
-              style={{ color: 'var(--text-muted)' }}
+              style={{ color: 'var(--text-secondary)' }}
             >
               {resumo.percentualPago.toFixed(0)}% pago
             </p>
@@ -151,7 +151,7 @@ export function ResumoCards({ resumo, receita, semContas, onEditReceita }: Props
               animate={{ width: `${Math.min(resumo.percentualPago, 100)}%` }}
               transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
               className="h-full rounded-full"
-              style={{ background: 'linear-gradient(90deg, #10B981, #7C72D8)' }}
+              style={{ background: 'var(--green)' }}
             />
           </div>
         </div>
@@ -169,7 +169,7 @@ export function ResumoCards({ resumo, receita, semContas, onEditReceita }: Props
           >
             <p
               className="text-[9px] font-semibold uppercase mb-1.5"
-              style={{ color: 'var(--text-subtle)', letterSpacing: '0.1em' }}
+              style={{ color: 'var(--text-tertiary)', letterSpacing: '0.1em' }}
             >
               {label}
             </p>

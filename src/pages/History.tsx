@@ -100,7 +100,7 @@ export function History({ userId }: Props) {
                 >
                   <p
                     className="text-[11px] font-medium uppercase mb-4"
-                    style={{ color: 'var(--text-subtle)', letterSpacing: '0.08em' }}
+                    style={{ color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}
                   >
                     Últimos meses
                   </p>
@@ -141,35 +141,35 @@ export function History({ userId }: Props) {
                       background: 'var(--card-bg)',
                       border: '0.5px solid var(--card-border)',
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--glass-bg)')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'var(--card-bg)')}
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <p className="font-medium capitalize text-[14px]" style={{ color: 'var(--text-primary)' }}>{formatMesLabel(mes.id)}</p>
-                        <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-subtle)' }}>
+                        <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
                           {mes.qtdContas} contas
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
                         <span
                           className="text-[14px] font-semibold"
-                          style={{ color: mes.sobra >= 0 ? '#1D9E75' : '#EF4444' }}
+                          style={{ color: mes.sobra >= 0 ? 'var(--green)' : 'var(--red)' }}
                         >
                           {formatBRL(mes.sobra)}
                         </span>
-                        <ArrowRight className="w-4 h-4" style={{ color: 'var(--text-subtle)' }} />
+                        <ArrowRight className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2">
                       {[
-                        { label: 'Receita', value: mes.receita, color: 'var(--text-muted)' as string, Icon: null },
+                        { label: 'Receita', value: mes.receita, color: 'var(--text-secondary)' as string, Icon: null },
                         { label: 'Pago', value: mes.totalPago, color: '#1D9E75', Icon: TrendingUp },
                         { label: 'Pendente', value: mes.totalPendente, color: '#EF9F27', Icon: TrendingDown },
                       ].map(({ label, value, color, Icon }) => (
                         <div key={label}>
-                          <p className="text-[11px] mb-0.5 flex items-center gap-1" style={{ color: 'var(--text-subtle)' }}>
+                          <p className="text-[11px] mb-0.5 flex items-center gap-1" style={{ color: 'var(--text-tertiary)' }}>
                             {Icon && <Icon className="w-3 h-3" style={{ color }} />}
                             {label}
                           </p>

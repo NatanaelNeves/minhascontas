@@ -48,7 +48,8 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    background: var(--bg-base, #0c0c0e);
+    color: var(--text-primary, rgba(255,255,255,0.9));
     font-feature-settings: 'cv01', 'cv02', 'cv03', 'cv04', 'ss01';
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -58,30 +59,6 @@
   }
 }
 
-/* App design tokens */
-:root {
-  --app-bg: #09090b;
-  --surface: rgba(255,255,255,0.035);
-  --surface-hover: rgba(255,255,255,0.055);
-  --border-subtle: rgba(255,255,255,0.07);
-  --border-medium: rgba(255,255,255,0.10);
-  --header-bg: rgba(9,9,11,0.88);
-  --glass-bg: rgba(255,255,255,0.05);
-  --glass-border: rgba(255,255,255,0.08);
-  --text-primary: #ffffff;
-  --text-muted: rgba(255,255,255,0.42);
-  --text-subtle: rgba(255,255,255,0.25);
-  --divider: rgba(255,255,255,0.06);
-  --modal-bg: #111113;
-  --accent-purple: #7C72D8;
-  --accent-green: #10B981;
-  --accent-amber: #F59E0B;
-  --metric-bg: rgba(255,255,255,0.04);
-  --metric-border: rgba(255,255,255,0.07);
-  --bills-bg: rgba(255,255,255,0.025);
-  --bills-border: rgba(255,255,255,0.07);
-  --empty-border: rgba(124,114,216,0.18);
-}
 
 /* Pulse animations for health indicator */
 @keyframes pulse-dot {

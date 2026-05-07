@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { BancoComSaldo, BancoInput, Banco } from '@/types'
+import { formatBRL } from '@/lib/utils'
 import { BankCard } from './BankCard'
 import { BankModal } from './BankModal'
 
@@ -38,12 +39,14 @@ export function BankList({ bancos, onAdd, onUpdate, onDelete }: Props) {
     setEditando(null)
   }
 
+  const totalSaldo = bancos.reduce((acc, b) => acc + b.saldoAtual, 0)
+
   return (
     <div className="flex flex-col gap-3">
       {erroDelete && (
         <div
           className="rounded-lg px-4 py-3 text-sm"
-          style={{ background: '#EF444420', color: '#EF4444' }}
+          style={{ background: 'var(--red-muted)', color: 'var(--red)' }}
         >
           {erroDelete}
           <button className="ml-2 underline" onClick={() => setErroDelete(null)}>
@@ -52,10 +55,35 @@ export function BankList({ bancos, onAdd, onUpdate, onDelete }: Props) {
         </div>
       )}
 
+      {bancos.length > 0 && (
+        <div
+          className="rounded-xl px-4 py-3 flex items-center justify-between"
+          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+        >
+          <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>
+            Saldo total
+          </span>
+          <span
+            className="text-lg font-bold tracking-tight"
+            style={{ color: totalSaldo >= 0 ? 'var(--green)' : 'var(--red)' }}
+          >
+            {formatBRL(totalSaldo)}
+          </span>
+        </div>
+      )}
+
       {bancos.length === 0 && (
-        <p className="text-sm text-center py-8" style={{ color: 'var(--text-subtle)' }}>
-          Nenhum banco cadastrado.
-        </p>
+        <div className="flex flex-col items-center justify-center py-12 gap-3">
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+            style={{ background: 'var(--bg-elevated)' }}
+          >
+            🏦
+          </div>
+          <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+            Nenhum banco cadastrado.
+          </p>
+        </div>
       )}
 
       <motion.div

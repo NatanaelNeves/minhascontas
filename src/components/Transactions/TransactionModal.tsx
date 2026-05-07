@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Transacao, TransacaoInput, BancoComSaldo, CategoriaGasto, TipoTransacao } from '@/types'
 
 const CATEGORIAS: { value: CategoriaGasto; label: string }[] = [
@@ -15,6 +14,17 @@ const CATEGORIAS: { value: CategoriaGasto; label: string }[] = [
   { value: 'despesaFixa', label: 'Despesa Fixa' },
   { value: 'outros', label: 'Outros' },
 ]
+
+const inputStyle: React.CSSProperties = {
+  background: 'var(--bg-elevated)',
+  border: '1px solid var(--border)',
+  borderRadius: 8,
+  padding: '10px 12px',
+  fontSize: 14,
+  color: 'var(--text-primary)',
+  outline: 'none',
+  width: '100%',
+}
 
 interface Props {
   open: boolean
@@ -74,14 +84,19 @@ export function TransactionModal({ open, editando, bancos, onSave, onClose }: Pr
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-sm">
+      <DialogContent
+        className="max-w-sm"
+        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
+      >
         <DialogHeader>
-          <DialogTitle>{editando ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
+          <DialogTitle style={{ color: 'var(--text-primary)' }}>
+            {editando ? 'Editar lançamento' : 'Novo lançamento'}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3 pt-2">
           <div
             className="flex rounded-lg overflow-hidden"
-            style={{ border: '1px solid var(--border-subtle)' }}
+            style={{ border: '1px solid var(--border)', background: 'var(--bg-surface)' }}
           >
             {(['gasto', 'entrada'] as TipoTransacao[]).map(t => (
               <button
@@ -90,9 +105,10 @@ export function TransactionModal({ open, editando, bancos, onSave, onClose }: Pr
                 onClick={() => setTipo(t)}
                 className="flex-1 py-2 text-sm font-medium capitalize transition-colors"
                 style={{
-                  background:
-                    tipo === t ? (t === 'gasto' ? '#EF4444' : '#10B981') : 'transparent',
-                  color: tipo === t ? '#fff' : 'var(--text-subtle)',
+                  background: tipo === t
+                    ? (t === 'gasto' ? 'var(--red)' : 'var(--green)')
+                    : 'transparent',
+                  color: tipo === t ? '#fff' : 'var(--text-tertiary)',
                 }}
               >
                 {t === 'gasto' ? 'Gasto' : 'Entrada'}
@@ -101,8 +117,7 @@ export function TransactionModal({ open, editando, bancos, onSave, onClose }: Pr
           </div>
 
           <input
-            className="rounded-md px-3 py-2 text-sm bg-transparent outline-none"
-            style={{ border: '1px solid var(--border-subtle)' }}
+            style={inputStyle}
             placeholder="Descrição"
             value={descricao}
             onChange={e => setDescricao(e.target.value)}
@@ -110,8 +125,7 @@ export function TransactionModal({ open, editando, bancos, onSave, onClose }: Pr
           />
 
           <input
-            className="rounded-md px-3 py-2 text-sm bg-transparent outline-none"
-            style={{ border: '1px solid var(--border-subtle)' }}
+            style={inputStyle}
             type="number"
             min="0.01"
             step="0.01"
@@ -122,18 +136,13 @@ export function TransactionModal({ open, editando, bancos, onSave, onClose }: Pr
           />
 
           <select
-            className="rounded-md px-3 py-2 text-sm outline-none"
-            style={{
-              border: '1px solid var(--border-subtle)',
-              background: 'var(--surface)',
-              color: 'inherit',
-            }}
+            style={{ ...inputStyle }}
             value={bancoId}
             onChange={e => setBancoId(e.target.value)}
             required
           >
             {bancos.map(b => (
-              <option key={b.id} value={b.id}>
+              <option key={b.id} value={b.id} style={{ background: 'var(--bg-elevated)' }}>
                 {b.nome}
               </option>
             ))}
@@ -141,17 +150,12 @@ export function TransactionModal({ open, editando, bancos, onSave, onClose }: Pr
 
           {tipo === 'gasto' && (
             <select
-              className="rounded-md px-3 py-2 text-sm outline-none"
-              style={{
-                border: '1px solid var(--border-subtle)',
-                background: 'var(--surface)',
-                color: 'inherit',
-              }}
+              style={{ ...inputStyle }}
               value={categoria}
               onChange={e => setCategoria(e.target.value as CategoriaGasto)}
             >
               {CATEGORIAS.map(c => (
-                <option key={c.value} value={c.value}>
+                <option key={c.value} value={c.value} style={{ background: 'var(--bg-elevated)' }}>
                   {c.label}
                 </option>
               ))}
@@ -159,8 +163,7 @@ export function TransactionModal({ open, editando, bancos, onSave, onClose }: Pr
           )}
 
           <input
-            className="rounded-md px-3 py-2 text-sm bg-transparent outline-none"
-            style={{ border: '1px solid var(--border-subtle)' }}
+            style={inputStyle}
             type="date"
             value={data}
             onChange={e => setData(e.target.value)}
@@ -168,16 +171,29 @@ export function TransactionModal({ open, editando, bancos, onSave, onClose }: Pr
           />
 
           <input
-            className="rounded-md px-3 py-2 text-sm bg-transparent outline-none"
-            style={{ border: '1px solid var(--border-subtle)' }}
+            style={inputStyle}
             placeholder="Observação (opcional)"
             value={observacao}
             onChange={e => setObservacao(e.target.value)}
           />
 
-          <Button type="submit" className="w-full mt-1">
-            {editando ? 'Salvar' : 'Adicionar'}
-          </Button>
+          <div className="flex gap-2 mt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 h-10 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
+              style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="flex-1 h-10 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
+              style={{ background: 'var(--text-primary)', color: 'var(--bg-base)' }}
+            >
+              {editando ? 'Salvar' : 'Adicionar'}
+            </button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

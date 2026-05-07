@@ -16,14 +16,14 @@ export function ChartsLinhaDia({ gastosPorDia }: Props) {
   return (
     <div
       className="rounded-xl p-4"
-      style={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)' }}
+      style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
     >
       <p className="text-sm font-semibold mb-3">Gastos por dia</p>
       <ResponsiveContainer width="100%" height={160}>
         <LineChart data={chartData}>
           <XAxis
             dataKey="dia"
-            tick={{ fontSize: 11, fill: 'var(--text-subtle)' }}
+            tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }}
             axisLine={false}
             tickLine={false}
           />
@@ -33,7 +33,7 @@ export function ChartsLinhaDia({ gastosPorDia }: Props) {
             formatter={(v: any) => formatBRL(v as number)}
             contentStyle={{
               background: 'var(--surface)',
-              border: '1px solid var(--border-subtle)',
+              border: '1px solid var(--border)',
               borderRadius: 8,
               fontSize: 12,
             }}
@@ -41,7 +41,7 @@ export function ChartsLinhaDia({ gastosPorDia }: Props) {
           <Line
             type="monotone"
             dataKey="total"
-            stroke="#EF4444"
+            stroke="var(--red)"
             strokeWidth={2}
             dot={false}
           />

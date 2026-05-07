@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { AReceber, AReceberInput, BancoComSaldo } from '@/types'
+import { formatBRL } from '@/lib/utils'
 import { ReceivableItem } from './ReceivableItem'
 import { ReceivableModal } from './ReceivableModal'
 import { SelectBancoModal } from '@/components/Modals/SelectBancoModal'
@@ -56,26 +57,50 @@ export function ReceivableList({
     setEditando(null)
   }
 
+  const totalPendente = recebiveis.filter(r => !r.recebido).reduce((acc, r) => acc + r.valor, 0)
+
   return (
     <div className="flex flex-col gap-3">
+      {recebiveis.length > 0 && (
+        <div
+          className="rounded-xl px-4 py-3 flex items-center justify-between"
+          style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+        >
+          <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>
+            Pendente a receber
+          </span>
+          <span className="text-lg font-bold tracking-tight" style={{ color: 'var(--amber)' }}>
+            {formatBRL(totalPendente)}
+          </span>
+        </div>
+      )}
+
       {recebiveis.length === 0 && (
-        <p className="text-sm text-center py-8" style={{ color: 'var(--text-subtle)' }}>
-          Nenhum valor a receber cadastrado.
-        </p>
+        <div className="flex flex-col items-center justify-center py-12 gap-3">
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+            style={{ background: 'var(--bg-elevated)' }}
+          >
+            💰
+          </div>
+          <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+            Nenhum valor a receber cadastrado.
+          </p>
+        </div>
       )}
 
       {recebiveis.length > 0 && (
         <div
           className="rounded-xl overflow-hidden"
           style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border-subtle)',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
           }}
         >
           {recebiveis.map((r, i) => (
             <div
               key={r.id}
-              style={i > 0 ? { borderTop: '1px solid var(--border-subtle)' } : {}}
+              style={i > 0 ? { borderTop: '1px solid var(--border)' } : {}}
             >
               <ReceivableItem
                 recebivel={r}

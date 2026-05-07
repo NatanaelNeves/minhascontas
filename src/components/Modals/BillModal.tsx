@@ -42,7 +42,7 @@ function Label({ children }: { children: React.ReactNode }) {
       style={{
         fontSize: 10,
         fontWeight: 600,
-        color: 'var(--text-subtle)',
+        color: 'var(--text-tertiary)',
         letterSpacing: '0.09em',
         textTransform: 'uppercase',
         marginBottom: 8,
@@ -62,7 +62,7 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
         width: 40,
         height: 22,
         borderRadius: 99,
-        background: on ? '#10B981' : 'rgba(255,255,255,0.1)',
+        background: on ? 'var(--green)' : 'rgba(255,255,255,0.1)',
         position: 'relative',
         cursor: 'pointer',
         border: 'none',
@@ -91,8 +91,8 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 
 const baseInput = {
   width: '100%',
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border)',
   borderRadius: 10,
   padding: '11px 14px',
   fontSize: 14,
@@ -162,12 +162,12 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
   const canSave = form.nome.trim().length > 0 && parseValor(valorStr) > 0
 
   function focusInput(e: React.FocusEvent<HTMLInputElement>) {
-    e.target.style.borderColor = 'rgba(124,114,216,0.55)'
-    e.target.style.background = 'rgba(255,255,255,0.06)'
+    e.target.style.borderColor = 'var(--border-strong)'
+    e.target.style.background = 'var(--bg-elevated)'
   }
   function blurInput(e: React.FocusEvent<HTMLInputElement>) {
-    e.target.style.borderColor = 'rgba(255,255,255,0.08)'
-    e.target.style.background = 'rgba(255,255,255,0.04)'
+    e.target.style.borderColor = 'var(--border)'
+    e.target.style.background = 'var(--bg-surface)'
   }
 
   return createPortal(
@@ -206,8 +206,8 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
               bottom: 0,
               zIndex: 51,
               width: 'min(420px, 100vw)',
-              background: '#111113',
-              borderLeft: '0.5px solid rgba(255,255,255,0.08)',
+              background: 'var(--bg-elevated)',
+              borderLeft: '0.5px solid var(--border)',
               display: 'flex',
               flexDirection: 'column',
             }}
@@ -216,7 +216,7 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
             <div
               style={{
                 padding: '18px 22px',
-                borderBottom: '0.5px solid rgba(255,255,255,0.06)',
+                borderBottom: '0.5px solid var(--border)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -228,7 +228,7 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                   style={{
                     fontSize: 10,
                     fontWeight: 600,
-                    color: 'var(--text-subtle)',
+                    color: 'var(--text-tertiary)',
                     letterSpacing: '0.09em',
                     textTransform: 'uppercase',
                     marginBottom: 3,
@@ -253,17 +253,17 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                   width: 30,
                   height: 30,
                   borderRadius: 8,
-                  background: 'rgba(255,255,255,0.06)',
-                  border: 'none',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: 'var(--text-muted)',
+                  color: 'var(--text-tertiary)',
                   transition: 'background .15s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-surface)')}
               >
                 <X size={14} />
               </button>
@@ -306,7 +306,7 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                       transform: 'translateY(-50%)',
                       fontSize: 16,
                       fontWeight: 600,
-                      color: 'var(--text-subtle)',
+                      color: 'var(--text-tertiary)',
                       pointerEvents: 'none',
                       letterSpacing: '-0.02em',
                       userSelect: 'none',
@@ -340,8 +340,8 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                   style={{
                     display: 'flex',
                     gap: 3,
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,255,255,0.08)',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border)',
                     borderRadius: 10,
                     padding: 3,
                   }}
@@ -362,8 +362,8 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                         border: 'none',
                         fontFamily: 'inherit',
                         transition: 'all .15s',
-                        background: form.categoria === opt.value ? 'rgba(255,255,255,0.92)' : 'transparent',
-                        color: form.categoria === opt.value ? '#09090b' : 'var(--text-muted)',
+                        background: form.categoria === opt.value ? 'var(--text-primary)' : 'transparent',
+                        color: form.categoria === opt.value ? 'var(--bg-base)' : 'var(--text-secondary)',
                         letterSpacing: '-0.01em',
                       }}
                     >
@@ -396,10 +396,10 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                           alignItems: 'center',
                           gap: 5,
                           border: selected
-                            ? '1px solid rgba(255,255,255,0.85)'
-                            : '1px solid rgba(255,255,255,0.09)',
-                          background: selected ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.04)',
-                          color: selected ? '#09090b' : 'var(--text-muted)',
+                            ? '1px solid var(--text-primary)'
+                            : '1px solid var(--border)',
+                          background: selected ? 'var(--text-primary)' : 'var(--bg-surface)',
+                          color: selected ? 'var(--bg-base)' : 'var(--text-secondary)',
                           letterSpacing: '-0.01em',
                         }}
                       >
@@ -420,7 +420,7 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                   onChange={e => setForm(f => ({ ...f, vencimento: e.target.value || null }))}
                   style={{
                     ...baseInput,
-                    color: form.vencimento ? '#fff' : 'var(--text-subtle)',
+                    color: form.vencimento ? 'var(--text-primary)' : 'var(--text-tertiary)',
                     colorScheme: 'dark',
                   }}
                   onFocus={focusInput}
@@ -435,16 +435,16 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '12px 14px',
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border)',
                   borderRadius: 10,
                 }}
               >
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: '#fff', letterSpacing: '-0.01em' }}>
+                  <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
                     Parcelado
                   </p>
-                  <p style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 2 }}>
+                  <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
                     Dividido em várias parcelas
                   </p>
                 </div>
@@ -500,16 +500,16 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '12px 14px',
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border)',
                   borderRadius: 10,
                 }}
               >
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: '#fff', letterSpacing: '-0.01em' }}>
+                  <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
                     Já foi pago
                   </p>
-                  <p style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 2 }}>
+                  <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
                     Marcar como pago agora
                   </p>
                 </div>
@@ -521,7 +521,7 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
             <div
               style={{
                 padding: '14px 22px',
-                borderTop: '0.5px solid rgba(255,255,255,0.06)',
+                borderTop: '0.5px solid var(--border)',
                 display: 'flex',
                 gap: 8,
                 flexShrink: 0,
@@ -533,9 +533,9 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                   flex: 1,
                   padding: '12px',
                   borderRadius: 10,
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  color: 'var(--text-muted)',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-secondary)',
                   fontSize: 13,
                   fontWeight: 500,
                   fontFamily: 'inherit',
@@ -543,8 +543,8 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                   letterSpacing: '-0.01em',
                   transition: 'color .15s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
               >
                 Cancelar
               </button>
@@ -555,9 +555,9 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                   flex: 2,
                   padding: '12px',
                   borderRadius: 10,
-                  background: canSave ? 'rgba(255,255,255,0.94)' : 'rgba(255,255,255,0.06)',
+                  background: canSave ? 'var(--text-primary)' : 'rgba(255,255,255,0.06)',
                   border: 'none',
-                  color: canSave ? '#09090b' : 'var(--text-subtle)',
+                  color: canSave ? 'var(--bg-base)' : 'var(--text-tertiary)',
                   fontSize: 13,
                   fontWeight: 600,
                   fontFamily: 'inherit',

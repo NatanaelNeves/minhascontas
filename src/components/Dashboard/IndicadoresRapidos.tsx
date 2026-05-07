@@ -20,11 +20,11 @@ function Indicador({ label, value, color }: IndicadorProps) {
   return (
     <div
       className="flex flex-col gap-0.5 rounded-xl px-3 py-3"
-      style={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)' }}
+      style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
     >
       <span
         className="text-[10px] uppercase tracking-wide"
-        style={{ color: 'var(--text-subtle)' }}
+        style={{ color: 'var(--text-tertiary)' }}
       >
         {label}
       </span>
@@ -49,31 +49,31 @@ export function IndicadoresRapidos({
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        <Indicador label="Saldo Total" value={formatBRL(totalSaldo)} color="#ffffff" />
-        <Indicador label="Total Gastos" value={formatBRL(totalGastos)} color="#EF4444" />
-        <Indicador label="Total Entradas" value={formatBRL(totalEntradas)} color="#10B981" />
-        <Indicador label="Despesas Fixas" value={formatBRL(totalFixas)} color="#7C72D8" />
-        <Indicador label="A Receber" value={formatBRL(totalPendente)} color="#F59E0B" />
+        <Indicador label="Saldo Total" value={formatBRL(totalSaldo)} color="var(--text-primary)" />
+        <Indicador label="Total Gastos" value={formatBRL(totalGastos)} color="var(--red)" />
+        <Indicador label="Total Entradas" value={formatBRL(totalEntradas)} color="var(--green)" />
+        <Indicador label="Despesas Fixas" value={formatBRL(totalFixas)} color="var(--purple)" />
+        <Indicador label="A Receber" value={formatBRL(totalPendente)} color="var(--amber)" />
         <Indicador
           label="Fixas Pagas"
           value={`${fixasPagas} de ${fixasTotal}`}
-          color={fixasPagas === fixasTotal && fixasTotal > 0 ? '#10B981' : '#ffffff'}
+          color={fixasPagas === fixasTotal && fixasTotal > 0 ? 'var(--green)' : 'var(--text-primary)'}
         />
       </div>
 
       <div
         className="rounded-xl px-4 py-3 flex items-center justify-between"
-        style={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)' }}
+        style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
       >
         <span
           className="text-xs uppercase tracking-wide"
-          style={{ color: 'var(--text-subtle)' }}
+          style={{ color: 'var(--text-tertiary)' }}
         >
           Saldo Real (incl. A Receber)
         </span>
         <span
           className="text-lg font-bold tracking-tight"
-          style={{ color: saldoReal >= 0 ? '#10B981' : '#EF4444' }}
+          style={{ color: saldoReal >= 0 ? 'var(--green)' : 'var(--red)' }}
         >
           {formatBRL(saldoReal)}
         </span>

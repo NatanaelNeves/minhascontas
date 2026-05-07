@@ -45,8 +45,8 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
         style={
           conta.pago
             ? {
-                background: '#10B981',
-                border: '1.5px solid #10B981',
+                background: 'var(--green)',
+                border: '1.5px solid var(--green)',
               }
             : {
                 border: '1.5px solid rgba(255,255,255,0.15)',
@@ -90,7 +90,7 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
           style={
             conta.pago
               ? {
-                  color: 'var(--text-subtle)',
+                  color: 'var(--text-tertiary)',
                   textDecoration: 'line-through',
                   textDecorationColor: 'rgba(255,255,255,0.18)',
                 }
@@ -99,7 +99,7 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
         >
           {conta.nome}
         </p>
-        <p className="text-[11px] mt-[1px]" style={{ color: 'var(--text-subtle)' }}>
+        <p className="text-[11px] mt-[1px]" style={{ color: 'var(--text-tertiary)' }}>
           {FORMA_LABEL[conta.formaPagamento]}
         </p>
       </div>
@@ -108,7 +108,7 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
       <div className="flex flex-col items-end gap-1 flex-shrink-0">
         <span
           className="text-[13px] font-semibold tabular-nums"
-          style={conta.pago ? { color: 'var(--text-subtle)' } : { color: '#fff', letterSpacing: '-0.02em' }}
+          style={conta.pago ? { color: 'var(--text-tertiary)' } : { color: '#fff', letterSpacing: '-0.02em' }}
         >
           {formatBRL(conta.valor)}
         </span>
@@ -118,8 +118,8 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
             <span
               className="text-[10px] font-medium px-1.5 py-[2px] rounded-full"
               style={{
-                background: 'rgba(124,114,216,0.12)',
-                color: '#9D94E8',
+                background: 'var(--purple-muted)',
+                color: 'var(--purple)',
                 border: '0.5px solid rgba(124,114,216,0.22)',
                 letterSpacing: '0.01em',
               }}
@@ -132,8 +132,8 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
             <span
               className="text-[10px] font-medium px-1.5 py-[2px] rounded-full"
               style={{
-                background: 'rgba(239,68,68,0.1)',
-                color: '#F87171',
+                background: 'var(--red-muted)',
+                color: 'var(--red)',
                 border: '0.5px solid rgba(239,68,68,0.2)',
               }}
             >
@@ -145,8 +145,8 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
             <span
               className="text-[10px] font-medium px-1.5 py-[2px] rounded-full"
               style={{
-                background: 'rgba(245,158,11,0.1)',
-                color: '#FBBF24',
+                background: 'var(--amber-muted)',
+                color: 'var(--amber)',
                 border: '0.5px solid rgba(245,158,11,0.2)',
               }}
             >
@@ -171,8 +171,8 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
               onClick={() => { onDelete(conta.id); setConfirmando(false) }}
               className="text-[11px] font-medium px-2 py-[3px] rounded-md transition-colors"
               style={{
-                background: 'rgba(239,68,68,0.12)',
-                color: '#F87171',
+                background: 'var(--red-muted)',
+                color: 'var(--red)',
                 border: '0.5px solid rgba(239,68,68,0.22)',
               }}
             >
@@ -183,7 +183,7 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
               className="text-[11px] font-medium px-2 py-[3px] rounded-md"
               style={{
                 background: 'rgba(255,255,255,0.05)',
-                color: 'var(--text-subtle)',
+                color: 'var(--text-tertiary)',
                 border: '0.5px solid rgba(255,255,255,0.08)',
               }}
             >
@@ -201,18 +201,18 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
             <button
               onClick={() => onEdit(conta)}
               className="w-6 h-6 rounded-md flex items-center justify-center transition-colors"
-              style={{ color: 'var(--text-subtle)' }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-muted)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-subtle)')}
+              style={{ color: 'var(--text-tertiary)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
             >
               <Pencil className="w-[11px] h-[11px]" />
             </button>
             <button
               onClick={() => setConfirmando(true)}
               className="w-6 h-6 rounded-md flex items-center justify-center transition-colors"
-              style={{ color: 'var(--text-subtle)' }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#F87171')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-subtle)')}
+              style={{ color: 'var(--text-tertiary)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
             >
               <Trash2 className="w-[11px] h-[11px]" />
             </button>

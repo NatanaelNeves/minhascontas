@@ -101,7 +101,7 @@ export function Dashboard({ userId }: { userId: string }) {
     ])
     const el = document.getElementById('tab-content')
     if (!el) return
-    const canvas = await html2canvas(el, { backgroundColor: '#09090b', scale: 2 })
+    const canvas = await html2canvas(el, { backgroundColor: '#0c0c0e', scale: 2 })
     const pdf = new jsPDF({ unit: 'px', format: [canvas.width / 2, canvas.height / 2] })
     pdf.addImage(
       canvas.toDataURL('image/png'),
@@ -126,7 +126,7 @@ export function Dashboard({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--app-bg)' }}>
+    <div className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
       <Header />
 
       <main
@@ -220,7 +220,7 @@ export function Dashboard({ userId }: { userId: string }) {
         <div
           className="fixed bottom-16 inset-x-0 flex justify-center items-end pb-5 pt-16 pointer-events-none"
           style={{
-            background: 'linear-gradient(to top, #09090b 55%, transparent)',
+            background: 'linear-gradient(to top, var(--bg-base) 55%, transparent)',
             zIndex: 10,
           }}
         >
@@ -231,11 +231,10 @@ export function Dashboard({ userId }: { userId: string }) {
             onClick={handleFAB}
             className="pointer-events-auto flex items-center gap-2 rounded-full text-[13px] font-semibold"
             style={{
-              background: '#ffffff',
-              color: '#09090b',
+              background: 'var(--text-primary)',
+              color: 'var(--bg-base)',
               padding: '12px 26px',
               letterSpacing: '-0.02em',
-              boxShadow: '0 2px 16px rgba(0,0,0,0.5)',
             }}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}

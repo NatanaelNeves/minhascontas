@@ -29,14 +29,14 @@ export function CopiarFixosModal({ open, mesOrigemId, mesDestinoId, onCopiar, on
       <DialogContent
         className="p-0 gap-0 max-w-sm overflow-hidden"
         style={{
-          background: 'var(--modal-bg)',
-          border: '0.5px solid var(--modal-border)',
+          background: 'var(--bg-elevated)',
+          border: '0.5px solid var(--border)',
           borderRadius: 18,
         }}
       >
         {/* Header */}
         <div style={{ padding: '22px 24px 18px', borderBottom: '0.5px solid var(--divider)' }}>
-          <p style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-subtle)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 5 }}>
+          <p style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 5 }}>
             {formatMesLabel(mesDestinoId)}
           </p>
           <p style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
@@ -53,22 +53,22 @@ export function CopiarFixosModal({ open, mesOrigemId, mesDestinoId, onCopiar, on
               width: 48,
               height: 48,
               borderRadius: 14,
-              background: 'rgba(127,119,221,0.12)',
-              border: '0.5px solid rgba(127,119,221,0.2)',
+              background: 'var(--purple-muted)',
+              border: '0.5px solid rgba(124,114,216,0.2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Copy style={{ width: 20, height: 20, color: '#7F77DD' }} />
+            <Copy style={{ width: 20, height: 20, color: 'var(--purple)' }} />
           </motion.div>
 
           <div>
             <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.5 }}>
               Copiar contas fixas de{' '}
-              <span style={{ color: '#7F77DD' }} className="capitalize">{formatMesLabel(mesOrigemId)}</span>?
+              <span style={{ color: 'var(--purple)' }} className="capitalize">{formatMesLabel(mesOrigemId)}</span>?
             </p>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.6 }}>
               Contas da categoria <span style={{ color: 'var(--text-primary)' }}>Fixo</span> serão copiadas para{' '}
               <span style={{ color: 'var(--text-primary)' }} className="capitalize">{formatMesLabel(mesDestinoId)}</span> como não pagas.
               Parcelas serão incrementadas automaticamente.
@@ -85,9 +85,9 @@ export function CopiarFixosModal({ open, mesOrigemId, mesDestinoId, onCopiar, on
               flex: 1,
               padding: 13,
               borderRadius: 10,
-              background: 'var(--glass-bg)',
-              border: '1px solid var(--glass-border)',
-              color: 'var(--text-muted)',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-secondary)',
               fontSize: 12,
               fontWeight: 500,
               fontFamily: 'inherit',
@@ -104,9 +104,9 @@ export function CopiarFixosModal({ open, mesOrigemId, mesDestinoId, onCopiar, on
               flex: 2,
               padding: 13,
               borderRadius: 10,
-              background: 'linear-gradient(135deg, #7F77DD, #534AB7)',
+              background: 'var(--text-primary)',
               border: 'none',
-              color: '#fff',
+              color: 'var(--bg-base)',
               fontSize: 13,
               fontWeight: 600,
               fontFamily: 'inherit',
@@ -116,7 +116,6 @@ export function CopiarFixosModal({ open, mesOrigemId, mesDestinoId, onCopiar, on
               alignItems: 'center',
               justifyContent: 'center',
               gap: 7,
-              boxShadow: '0 4px 16px rgba(127,119,221,0.35)',
               transition: 'opacity .15s',
             }}
           >

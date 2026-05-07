@@ -26,9 +26,9 @@ export function BottomNav({ ativa, onChange }: Props) {
     <nav
       className="fixed bottom-0 inset-x-0 flex items-center justify-around z-50"
       style={{
-        background: 'var(--surface)',
-        borderTop: '0.5px solid var(--border-subtle)',
-        height: 64,
+        background: 'var(--bg-surface)',
+        borderTop: '0.5px solid var(--border)',
+        height: 56,
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
@@ -40,14 +40,15 @@ export function BottomNav({ ativa, onChange }: Props) {
             key={tab.id}
             onClick={() => onChange(tab.id)}
             className="flex flex-col items-center gap-0.5 px-3 py-2 relative"
-            style={{ color: isActive ? '#ffffff' : 'var(--text-subtle)', minWidth: 60 }}
+            style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-tertiary)', minWidth: 60 }}
           >
             <Icon className="w-5 h-5" />
             <span className="text-[10px] font-medium leading-none">{tab.label}</span>
             {isActive && (
               <motion.div
                 layoutId="tab-dot"
-                className="absolute -bottom-1 w-1 h-1 rounded-full bg-white"
+                className="absolute -bottom-1 w-1 h-1 rounded-full"
+              style={{ background: 'var(--green)' }}
               />
             )}
           </button>

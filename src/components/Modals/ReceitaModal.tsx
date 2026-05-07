@@ -33,14 +33,14 @@ export function ReceitaModal({ open, valorAtual, onSave, onClose }: Props) {
       <DialogContent
         className="p-0 gap-0 max-w-xs overflow-hidden"
         style={{
-          background: 'var(--modal-bg)',
-          border: '0.5px solid var(--modal-border)',
+          background: 'var(--bg-elevated)',
+          border: '0.5px solid var(--border)',
           borderRadius: 18,
         }}
       >
         {/* Header */}
         <div style={{ padding: '22px 24px 18px', borderBottom: '0.5px solid var(--divider)' }}>
-          <p style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-subtle)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 5 }}>
+          <p style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 5 }}>
             {formatMesLabel(mesAtivo)}
           </p>
           <p style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
@@ -50,7 +50,7 @@ export function ReceitaModal({ open, valorAtual, onSave, onClose }: Props) {
 
         {/* Body */}
         <div style={{ padding: '22px 24px' }}>
-          <p style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 7 }}>
+          <p style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 7 }}>
             Valor (R$)
           </p>
           <div style={{ position: 'relative' }}>
@@ -61,7 +61,7 @@ export function ReceitaModal({ open, valorAtual, onSave, onClose }: Props) {
               transform: 'translateY(-50%)',
               fontSize: 18,
               fontWeight: 600,
-              color: 'var(--text-subtle)',
+              color: 'var(--text-tertiary)',
               pointerEvents: 'none',
             }}>R$</span>
             <input
@@ -73,8 +73,8 @@ export function ReceitaModal({ open, valorAtual, onSave, onClose }: Props) {
               onKeyDown={e => e.key === 'Enter' && handleSave()}
               style={{
                 width: '100%',
-                background: 'var(--glass-bg)',
-                border: '1px solid var(--glass-border)',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
                 borderRadius: 10,
                 padding: '14px 14px 14px 48px',
                 fontSize: 26,
@@ -85,8 +85,8 @@ export function ReceitaModal({ open, valorAtual, onSave, onClose }: Props) {
                 fontFamily: 'inherit',
                 transition: 'border-color .15s',
               }}
-              onFocus={e => (e.target.style.borderColor = 'rgba(127,119,221,0.5)')}
-              onBlur={e => (e.target.style.borderColor = 'var(--glass-border)')}
+              onFocus={e => (e.target.style.borderColor = 'var(--border-strong)')}
+              onBlur={e => (e.target.style.borderColor = 'var(--border)')}
             />
           </div>
         </div>
@@ -99,9 +99,9 @@ export function ReceitaModal({ open, valorAtual, onSave, onClose }: Props) {
               flex: 1,
               padding: 13,
               borderRadius: 10,
-              background: 'var(--glass-bg)',
-              border: '1px solid var(--glass-border)',
-              color: 'var(--text-muted)',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-secondary)',
               fontSize: 13,
               fontWeight: 500,
               fontFamily: 'inherit',
@@ -117,14 +117,13 @@ export function ReceitaModal({ open, valorAtual, onSave, onClose }: Props) {
               flex: 2,
               padding: 13,
               borderRadius: 10,
-              background: canSave ? 'linear-gradient(135deg, #7F77DD, #534AB7)' : 'var(--glass-bg)',
-              border: canSave ? 'none' : '1px solid var(--glass-border)',
-              color: canSave ? '#fff' : 'var(--text-subtle)',
+              background: canSave ? 'var(--text-primary)' : 'var(--bg-surface)',
+              border: canSave ? 'none' : '1px solid var(--border)',
+              color: canSave ? 'var(--bg-base)' : 'var(--text-tertiary)',
               fontSize: 13,
               fontWeight: 600,
               fontFamily: 'inherit',
               cursor: canSave ? 'pointer' : 'not-allowed',
-              boxShadow: canSave ? '0 4px 16px rgba(127,119,221,0.35)' : 'none',
               transition: 'all .2s',
             }}
           >

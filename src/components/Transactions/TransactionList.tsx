@@ -32,9 +32,17 @@ export function TransactionList({ transacoes, bancos, onEdit, onDelete }: Props)
 
   if (transacoes.length === 0) {
     return (
-      <p className="text-sm text-center py-8" style={{ color: 'var(--text-subtle)' }}>
-        Nenhum lançamento registrado.
-      </p>
+      <div className="flex flex-col items-center justify-center py-12 gap-3">
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+          style={{ background: 'var(--bg-elevated)' }}
+        >
+          📊
+        </div>
+        <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+          Nenhum lançamento registrado.
+        </p>
+      </div>
     )
   }
 
@@ -49,25 +57,24 @@ export function TransactionList({ transacoes, bancos, onEdit, onDelete }: Props)
           <div key={data}>
             <div
               className="flex items-center justify-between py-1.5 text-xs font-semibold sticky top-0"
-              style={{ color: 'var(--text-subtle)', background: 'var(--app-bg)' }}
+              style={{ color: 'var(--text-tertiary)', background: 'var(--bg-base)' }}
             >
               <span>{formatGroupDate(data)}</span>
-              <span style={{ color: totalDia >= 0 ? '#10B981' : '#EF4444' }}>
+              <span style={{ color: totalDia >= 0 ? 'var(--green)' : 'var(--red)' }}>
                 {totalDia >= 0 ? '+' : ''}{formatBRL(Math.abs(totalDia))}
               </span>
             </div>
             <div
-              className="rounded-xl"
+              className="rounded-xl overflow-hidden"
               style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border-subtle)',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
               }}
             >
               {txs.map((t, i) => (
                 <div
                   key={t.id}
-                  className="px-4"
-                  style={i > 0 ? { borderTop: '1px solid var(--border-subtle)' } : {}}
+                  style={i > 0 ? { borderTop: '1px solid var(--border)' } : {}}
                 >
                   <TransactionItem
                     transacao={t}

@@ -8,9 +8,9 @@ function ChevronBtn({ onClick, children }: { onClick: () => void; children: Reac
     <button
       onClick={onClick}
       className="w-6 h-6 flex items-center justify-center transition-colors rounded-md"
-      style={{ color: 'var(--text-subtle)' }}
+      style={{ color: 'var(--text-tertiary)' }}
       onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
-      onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-subtle)')}
+      onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
     >
       {children}
     </button>
@@ -26,7 +26,7 @@ export function Header() {
       className="sticky top-0 z-20 backdrop-blur-xl"
       style={{
         background: 'var(--header-bg)',
-        borderBottom: '0.5px solid var(--border-subtle)',
+        borderBottom: '0.5px solid var(--border)',
       }}
     >
       <div className="max-w-2xl mx-auto px-5 h-[52px] flex items-center justify-between gap-3">
@@ -39,7 +39,7 @@ export function Header() {
           <div
             className="w-[28px] h-[28px] rounded-[8px] flex items-center justify-center shrink-0"
             style={{
-              background: '#ffffff',
+              background: 'var(--text-primary)',
             }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -61,7 +61,7 @@ export function Header() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
             style={{
               background: 'var(--glass-bg)',
-              border: '0.5px solid var(--border-medium)',
+              border: '0.5px solid var(--border-strong)',
             }}
           >
             <ChevronBtn onClick={() => setMesAtivo(prevMesId(mesAtivo))}>
@@ -96,9 +96,9 @@ export function Header() {
             onClick={() => setCurrentPage(currentPage === 'history' ? 'dashboard' : 'history')}
             className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
             title={currentPage === 'history' ? 'Dashboard' : 'Histórico'}
-            style={{ color: 'var(--text-subtle)' }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-muted)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-subtle)')}
+            style={{ color: 'var(--text-tertiary)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.2" />

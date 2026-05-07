@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion'
-import { Pencil, Trash2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Pencil, Trash2, Check } from 'lucide-react'
 import { AReceber } from '@/types'
 import { formatBRL } from '@/lib/utils'
 
@@ -15,54 +15,76 @@ export function ReceivableItem({ recebivel: r, onToggle, onEdit, onDelete }: Pro
     <motion.div
       layout
       initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{ opacity: r.recebido ? 0.5 : 1, y: 0 }}
       className="flex items-center gap-3 px-4 py-3"
-      style={{ opacity: r.recebido ? 0.5 : 1 }}
     >
+      {/* Checkbox */}
+      <motion.button
+        onClick={() => onToggle(r.id)}
+        className="shrink-0 flex items-center justify-center rounded-md"
+        style={{
+          width: 18,
+          height: 18,
+          background: r.recebido ? 'var(--green)' : 'transparent',
+          border: r.recebido ? 'none' : '1.5px solid var(--border-strong)',
+        }}
+        whileTap={{ scale: 0.85 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      >
+        <AnimatePresence>
+          {r.recebido && (
+            <motion.div
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            >
+              <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.button>
+
+      {/* Avatar */}
       <div
-        className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
-        style={{ background: '#7C72D820', color: '#7C72D8' }}
+        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+        style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
       >
         {r.nome[0].toUpperCase()}
       </div>
+
+      {/* Info */}
       <div className="flex-1 min-w-0">
         <p
           className="text-sm font-medium truncate"
-          style={{ textDecoration: r.recebido ? 'line-through' : 'none' }}
+          style={{
+            textDecoration: r.recebido ? 'line-through' : 'none',
+            color: r.recebido ? 'var(--text-tertiary)' : 'var(--text-primary)',
+          }}
         >
           {r.nome}
         </p>
         {r.dataPrevista && (
-          <p className="text-xs" style={{ color: 'var(--text-subtle)' }}>
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
             Previsto: {r.dataPrevista.split('-').reverse().join('/')}
           </p>
         )}
       </div>
-      <span className="text-sm font-semibold" style={{ color: '#F59E0B' }}>
+
+      <span className="text-sm font-semibold" style={{ color: r.recebido ? 'var(--text-tertiary)' : 'var(--amber)' }}>
         {formatBRL(r.valor)}
       </span>
-      <div className="flex items-center gap-2 shrink-0">
-        {!r.recebido && (
-          <>
-            <button onClick={() => onEdit(r)} style={{ color: 'var(--text-subtle)' }}>
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={() => onDelete(r.id)} style={{ color: 'var(--text-subtle)' }}>
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </>
-        )}
-        <button
-          onClick={() => onToggle(r.id)}
-          className="w-9 h-5 rounded-full transition-colors relative"
-          style={{ background: r.recebido ? '#10B981' : 'var(--border-subtle)' }}
-        >
-          <div
-            className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
-            style={{ transform: r.recebido ? 'translateX(18px)' : 'translateX(2px)' }}
-          />
-        </button>
-      </div>
+
+      {!r.recebido && (
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={() => onEdit(r)} style={{ color: 'var(--text-tertiary)' }}>
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => onDelete(r.id)} style={{ color: 'var(--text-tertiary)' }}>
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </motion.div>
   )
 }
