@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useAppStore } from '@/store/useAppStore'
-import { formatMesLabel } from '@/lib/utils'
+import { formatMesLabel, centavosToDisplay, valorToCentStr } from '@/lib/utils'
 
 interface Props {
   open: boolean
@@ -12,21 +12,23 @@ interface Props {
 
 export function ReceitaModal({ open, valorAtual, onSave, onClose }: Props) {
   const { mesAtivo } = useAppStore()
-  const [valorStr, setValorStr] = useState('')
+  const [centStr, setCentStr] = useState('')
 
   useEffect(() => {
     if (open) {
-      setValorStr(valorAtual > 0 ? valorAtual.toFixed(2).replace('.', ',') : '')
+      setCentStr(valorAtual > 0 ? valorToCentStr(valorAtual) : '')
     }
   }, [open, valorAtual])
 
+  function getCents(): number { return parseInt(centStr || '0', 10) }
+
   function handleSave() {
-    const valor = parseFloat(valorStr.replace(',', '.')) || 0
+    const valor = getCents() / 100
     if (valor > 0) onSave(valor)
     onClose()
   }
 
-  const canSave = (parseFloat(valorStr.replace(',', '.')) || 0) > 0
+  const canSave = getCents() > 0
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
@@ -65,10 +67,10 @@ export function ReceitaModal({ open, valorAtual, onSave, onClose }: Props) {
               pointerEvents: 'none',
             }}>R$</span>
             <input
-              value={valorStr}
-              onChange={e => setValorStr(e.target.value)}
+              value={centavosToDisplay(centStr)}
+              onChange={e => setCentStr(e.target.value.replace(/\D/g, ''))}
               placeholder="0,00"
-              inputMode="decimal"
+              inputMode="numeric"
               autoFocus
               onKeyDown={e => e.key === 'Enter' && handleSave()}
               style={{

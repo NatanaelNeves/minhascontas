@@ -73,7 +73,7 @@ export function BankList({ bancos, onAdd, onUpdate, onDelete }: Props) {
       )}
 
       {bancos.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 gap-3">
+        <div className="flex flex-col items-center justify-center py-12 gap-4">
           <div
             className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
             style={{ background: 'var(--bg-elevated)' }}
@@ -81,8 +81,19 @@ export function BankList({ bancos, onAdd, onUpdate, onDelete }: Props) {
             🏦
           </div>
           <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-            Nenhum banco cadastrado.
+            Nenhum banco cadastrado
           </p>
+          <button
+            onClick={() => { setEditando(null); setModalOpen(true) }}
+            style={{
+              padding: '10px 20px', borderRadius: 99, fontSize: 13, fontWeight: 600,
+              background: 'var(--text-primary)', color: 'var(--bg-base)',
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            ＋ Adicionar primeiro banco
+          </button>
         </div>
       )}
 

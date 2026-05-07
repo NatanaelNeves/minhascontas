@@ -2,18 +2,19 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { Banco, BancoInput } from '@/types'
+import { Cartao, CartaoInput, TipoCartao } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { formatMesLabel, centavosToDisplay, valorToCentStr } from '@/lib/utils'
 
-const CORES = [
-  '#34c77b',
-  '#a78bfa',
-  '#f59e0b',
-  '#f87171',
-  '#60a5fa',
-  'rgba(255,255,255,0.3)',
+const TIPOS: { value: TipoCartao; label: string }[] = [
+  { value: 'credito', label: 'Crédito' },
+  { value: 'vale_alimentacao', label: 'Alimentação' },
+  { value: 'vale_combustivel', label: 'Combustível' },
+  { value: 'vale_refeicao', label: 'Refeição' },
+  { value: 'outros_beneficios', label: 'Outros' },
 ]
+
+const CORES_CARTAO = ['#34c77b', '#a78bfa', '#f59e0b', '#f87171', '#60a5fa', '#e2e8f0']
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -39,26 +40,35 @@ const baseInput = {
 
 interface Props {
   open: boolean
-  editando: Banco | null
-  onSave: (data: BancoInput) => void
+  editando: Cartao | null
+  onSave: (data: CartaoInput) => void
   onClose: () => void
 }
 
-export function BankModal({ open, editando, onSave, onClose }: Props) {
+export function CartaoModal({ open, editando, onSave, onClose }: Props) {
   const { mesAtivo } = useAppStore()
   const [nome, setNome] = useState('')
-  const [centStr, setCentStr] = useState('')
-  const [cor, setCor] = useState(CORES[0])
+  const [tipo, setTipo] = useState<TipoCartao>('credito')
+  const [limiteCentStr, setLimiteCentStr] = useState('')
+  const [diaFechamento, setDiaFechamento] = useState(1)
+  const [diaVencimento, setDiaVencimento] = useState(10)
+  const [cor, setCor] = useState(CORES_CARTAO[0])
 
   useEffect(() => {
     if (editando) {
       setNome(editando.nome)
-      setCentStr(valorToCentStr(editando.saldoInicial))
-      setCor(editando.cor ?? CORES[0])
+      setTipo(editando.tipo)
+      setLimiteCentStr(valorToCentStr(editando.limite))
+      setDiaFechamento(editando.diaFechamento)
+      setDiaVencimento(editando.diaVencimento)
+      setCor(editando.cor)
     } else {
       setNome('')
-      setCentStr('')
-      setCor(CORES[0])
+      setTipo('credito')
+      setLimiteCentStr('')
+      setDiaFechamento(1)
+      setDiaVencimento(10)
+      setCor(CORES_CARTAO[0])
     }
   }, [editando, open])
 
@@ -74,13 +84,22 @@ export function BankModal({ open, editando, onSave, onClose }: Props) {
     return () => { document.body.style.overflow = '' }
   }, [open])
 
+  function getCents() { return parseInt(limiteCentStr || '0', 10) }
+
   function handleSave() {
-    if (!nome.trim()) return
-    onSave({ nome: nome.trim(), saldoInicial: parseInt(centStr || '0', 10) / 100, cor })
+    if (!nome.trim() || getCents() <= 0) return
+    onSave({
+      nome: nome.trim(),
+      tipo,
+      limite: getCents() / 100,
+      diaFechamento,
+      diaVencimento,
+      cor,
+    })
     onClose()
   }
 
-  const canSave = nome.trim().length > 0
+  const canSave = nome.trim().length > 0 && getCents() > 0
 
   function focusInput(e: React.FocusEvent<HTMLInputElement>) {
     e.target.style.borderColor = 'var(--border-strong)'
@@ -131,7 +150,7 @@ export function BankModal({ open, editando, onSave, onClose }: Props) {
                   {formatMesLabel(mesAtivo)}
                 </p>
                 <p style={{ fontSize: 18, fontWeight: 600, color: '#fff', letterSpacing: '-0.03em' }}>
-                  {editando ? 'Editar banco' : 'Novo banco'}
+                  {editando ? 'Editar cartão' : 'Novo cartão'}
                 </p>
               </div>
               <button
@@ -153,7 +172,7 @@ export function BankModal({ open, editando, onSave, onClose }: Props) {
                 <input
                   value={nome}
                   onChange={e => setNome(e.target.value)}
-                  placeholder="ex: Nubank, Itaú, Carteira..."
+                  placeholder="ex: Nubank, VR, Alelo..."
                   autoFocus
                   style={baseInput}
                   onFocus={focusInput}
@@ -161,19 +180,75 @@ export function BankModal({ open, editando, onSave, onClose }: Props) {
                 />
               </div>
 
-              {/* Saldo Inicial */}
+              {/* Tipo — chips */}
               <div>
-                <Label>Saldo inicial (R$)</Label>
+                <Label>Tipo</Label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {TIPOS.map(t => {
+                    const sel = tipo === t.value
+                    return (
+                      <button
+                        key={t.value}
+                        type="button"
+                        onClick={() => setTipo(t.value)}
+                        style={{
+                          padding: '7px 14px', borderRadius: 99, fontSize: 13, fontWeight: 500,
+                          cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s', letterSpacing: '-0.01em',
+                          border: sel ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                          background: sel ? 'var(--text-primary)' : 'var(--bg-surface)',
+                          color: sel ? 'var(--bg-base)' : 'var(--text-secondary)',
+                        }}
+                      >
+                        {t.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Limite */}
+              <div>
+                <Label>Limite (R$)</Label>
                 <div style={{ position: 'relative' }}>
                   <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)', pointerEvents: 'none', userSelect: 'none' }}>
                     R$
                   </span>
                   <input
-                    value={centavosToDisplay(centStr)}
-                    onChange={e => setCentStr(e.target.value.replace(/\D/g, ''))}
+                    value={centavosToDisplay(limiteCentStr)}
+                    onChange={e => setLimiteCentStr(e.target.value.replace(/\D/g, ''))}
                     placeholder="0,00"
                     inputMode="numeric"
                     style={{ ...baseInput, paddingLeft: 46, fontSize: 24, fontWeight: 700, letterSpacing: '-0.04em', height: 58 }}
+                    onFocus={focusInput}
+                    onBlur={blurInput}
+                  />
+                </div>
+              </div>
+
+              {/* Dia de fechamento + vencimento */}
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <Label>Fecha todo dia</Label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={diaFechamento}
+                    onChange={e => setDiaFechamento(Math.min(31, Math.max(1, Number(e.target.value))))}
+                    style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
+                    onFocus={focusInput}
+                    onBlur={blurInput}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Label>Vence todo dia</Label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={diaVencimento}
+                    onChange={e => setDiaVencimento(Math.min(31, Math.max(1, Number(e.target.value))))}
+                    style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
                     onFocus={focusInput}
                     onBlur={blurInput}
                   />
@@ -184,7 +259,7 @@ export function BankModal({ open, editando, onSave, onClose }: Props) {
               <div>
                 <Label>Cor de identificação</Label>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  {CORES.map(c => (
+                  {CORES_CARTAO.map(c => (
                     <button
                       key={c}
                       type="button"
@@ -218,7 +293,7 @@ export function BankModal({ open, editando, onSave, onClose }: Props) {
                 disabled={!canSave}
                 style={{ flex: 2, padding: '12px', borderRadius: 10, background: canSave ? 'var(--text-primary)' : 'rgba(255,255,255,0.06)', border: 'none', color: canSave ? 'var(--bg-base)' : 'var(--text-tertiary)', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: canSave ? 'pointer' : 'not-allowed', transition: 'all .2s', letterSpacing: '-0.01em' }}
               >
-                {editando ? 'Salvar alterações' : 'Adicionar banco'}
+                {editando ? 'Salvar alterações' : 'Adicionar cartão'}
               </button>
             </div>
           </motion.div>

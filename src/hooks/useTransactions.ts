@@ -25,6 +25,7 @@ function docToTransacao(snap: QueryDocumentSnapshot<DocumentData>): Transacao {
     valor: d.valor,
     despesaFixa: d.despesaFixa ?? false,
     observacao: d.observacao,
+    cartaoId: d.cartaoId ?? undefined,
     origem: d.origem,
     criadoEm: d.criadoEm?.toDate() ?? new Date(),
   }

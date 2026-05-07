@@ -6,6 +6,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function centavosToDisplay(centStr: string): string {
+  if (!centStr) return ''
+  const cents = parseInt(centStr, 10)
+  if (isNaN(cents)) return ''
+  return (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+export function valorToCentStr(valor: number): string {
+  return Math.round(valor * 100).toString()
+}
+
 export function formatBRL(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',

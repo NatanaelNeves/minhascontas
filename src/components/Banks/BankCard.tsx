@@ -19,7 +19,17 @@ export function BankCard({ banco, onEdit, onDelete }: Props) {
       style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
     >
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{banco.nome}</span>
+        <div className="flex items-center gap-2">
+          {banco.cor && (
+            <div
+              style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: banco.cor, flexShrink: 0,
+              }}
+            />
+          )}
+          <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{banco.nome}</span>
+        </div>
         <div className="flex gap-2">
           <button onClick={() => onEdit(banco)} style={{ color: 'var(--text-tertiary)' }}>
             <Pencil className="w-3.5 h-3.5" />

@@ -1,4 +1,4 @@
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { CategoriaGasto } from '@/types'
 import { formatBRL } from '@/lib/utils'
 
@@ -59,8 +59,11 @@ export function ChartsPizza({ gastosPorCategoria }: Props) {
       value: valor,
       color: CATEGORIA_COLORS[cat] ?? '#94A3B8',
     }))
+    .sort((a, b) => b.value - a.value)
 
   if (data.length === 0) return null
+
+  const total = data.reduce((s, d) => s + d.value, 0)
 
   return (
     <div
@@ -70,14 +73,14 @@ export function ChartsPizza({ gastosPorCategoria }: Props) {
       <p className="text-xs uppercase tracking-widest font-medium mb-4" style={{ color: 'var(--text-tertiary)' }}>
         Por categoria
       </p>
-      <ResponsiveContainer width="100%" height={180}>
+      <ResponsiveContainer width="100%" height={160}>
         <PieChart>
           <Pie
             data={data}
             cx="50%"
             cy="50%"
-            innerRadius={50}
-            outerRadius={75}
+            innerRadius={46}
+            outerRadius={70}
             paddingAngle={3}
             dataKey="value"
           >
@@ -86,15 +89,36 @@ export function ChartsPizza({ gastosPorCategoria }: Props) {
             ))}
           </Pie>
           <Tooltip content={<CustomTooltip />} />
-          <Legend
-            iconType="circle"
-            iconSize={8}
-            formatter={(value) => (
-              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{value}</span>
-            )}
-          />
         </PieChart>
       </ResponsiveContainer>
+
+      {/* Custom legend with value + percentage */}
+      <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {data.map(item => (
+          <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div
+              style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: item.color, flexShrink: 0,
+              }}
+            />
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1, letterSpacing: '-0.01em' }}>
+              {item.name}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+              {formatBRL(item.value)}
+            </span>
+            <span
+              style={{
+                fontSize: 10, color: 'var(--text-disabled)',
+                minWidth: 32, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {((item.value / total) * 100).toFixed(0)}%
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
