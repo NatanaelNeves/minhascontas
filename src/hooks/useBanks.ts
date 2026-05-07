@@ -19,6 +19,7 @@ function docToBanco(snap: QueryDocumentSnapshot<DocumentData>): Banco {
     id: snap.id,
     nome: d.nome,
     saldoInicial: d.saldoInicial,
+    cor: d.cor ?? undefined,
     criadoEm: d.criadoEm?.toDate() ?? new Date(),
   }
 }
@@ -66,7 +67,7 @@ export function useBanks(
       bancosRaw.map(b => {
         const txs = porBanco[b.id] ?? []
         const gastos = txs
-          .filter(t => t.tipo === 'gasto')
+          .filter(t => t.tipo === 'gasto' && !t.cartaoId)
           .reduce((s, t) => s + t.valor, 0)
         const entradas = txs
           .filter(t => t.tipo === 'entrada')
