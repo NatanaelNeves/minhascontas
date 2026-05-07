@@ -1,9 +1,8 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-import { CategoriaGasto } from '@/types'
 import { formatBRL } from '@/lib/utils'
 
 interface Props {
-  gastosPorCategoria: Record<CategoriaGasto, number>
+  gastosPorCategoria: Record<string, number>
 }
 
 const CATEGORIA_COLORS: Record<string, string> = {
@@ -19,7 +18,7 @@ const CATEGORIA_COLORS: Record<string, string> = {
   outros: '#94A3B8',
 }
 
-const CATEGORIA_LABEL: Record<CategoriaGasto, string> = {
+const CATEGORIA_LABEL: Record<string, string> = {
   alimentacao: 'Alimentação',
   transporte: 'Transporte',
   saude: 'Saúde',
@@ -55,7 +54,7 @@ export function ChartsPizza({ gastosPorCategoria }: Props) {
   const data = Object.entries(gastosPorCategoria)
     .filter(([, v]) => v > 0)
     .map(([cat, valor]) => ({
-      name: CATEGORIA_LABEL[cat as CategoriaGasto] ?? cat,
+      name: CATEGORIA_LABEL[cat] ?? cat,
       value: valor,
       color: CATEGORIA_COLORS[cat] ?? '#94A3B8',
     }))

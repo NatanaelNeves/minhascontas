@@ -71,10 +71,13 @@ export interface AReceber {
 
 export type TipoTransacao = 'gasto' | 'entrada'
 
-export type CategoriaGasto =
-  | 'alimentacao' | 'transporte' | 'saude' | 'lazer'
-  | 'educacao' | 'moradia' | 'vestuario' | 'servicos'
-  | 'despesaFixa' | 'outros'
+export type CategoriaGasto = string
+
+export const CATEGORIAS_FIXAS = [
+  'alimentacao', 'transporte', 'saude', 'lazer',
+  'educacao', 'moradia', 'vestuario', 'servicos',
+  'despesaFixa', 'outros',
+] as const
 
 export interface TransacaoOrigem {
   tipo: 'bill' | 'receivable'

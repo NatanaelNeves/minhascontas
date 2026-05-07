@@ -13,7 +13,7 @@ import {
   DocumentData,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Transacao, TransacaoInput, CategoriaGasto } from '@/types'
+import { Transacao, TransacaoInput } from '@/types'
 
 function docToTransacao(snap: QueryDocumentSnapshot<DocumentData>): Transacao {
   const d = snap.data()
@@ -39,7 +39,7 @@ export interface UseTransactionsReturn {
   transacoes: Transacao[]
   totalGastos: number
   totalEntradas: number
-  gastosPorCategoria: Record<CategoriaGasto, number>
+  gastosPorCategoria: Record<string, number>
   gastosPorDia: { data: string; total: number }[]
   isLoading: boolean
   addTransacao: (t: TransacaoInput) => Promise<void>
@@ -75,7 +75,7 @@ export function useTransactions(userId: string, mesId: string): UseTransactionsR
   )
 
   const gastosPorCategoria = useMemo(() => {
-    const acc = {} as Record<CategoriaGasto, number>
+    const acc = {} as Record<string, number>
     transacoes.forEach(t => {
       if (t.tipo === 'gasto') {
         acc[t.categoria] = (acc[t.categoria] ?? 0) + t.valor

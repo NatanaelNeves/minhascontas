@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { Transacao, TransacaoInput, BancoComSaldo, CategoriaGasto, TipoTransacao, Cartao } from '@/types'
+import { Transacao, TransacaoInput, BancoComSaldo, TipoTransacao, Cartao } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { formatMesLabel, centavosToDisplay, valorToCentStr } from '@/lib/utils'
 
-const CATEGORIAS: { value: CategoriaGasto; label: string; emoji: string }[] = [
+const CATEGORIAS: { value: string; label: string; emoji: string }[] = [
   { value: 'alimentacao', label: 'Alimentação', emoji: '🍔' },
   { value: 'transporte', label: 'Transporte', emoji: '🚗' },
   { value: 'saude', label: 'Saúde', emoji: '💊' },
@@ -58,7 +58,9 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
   const [centStr, setCentStr] = useState('')
   const [bancoId, setBancoId] = useState('')
   const [cartaoId, setCartaoId] = useState<string | undefined>(undefined)
-  const [categoria, setCategoria] = useState<CategoriaGasto>('outros')
+  const [categoria, setCategoria] = useState<string>('outros')
+  const [customMode, setCustomMode] = useState(false)
+  const [customInput, setCustomInput] = useState('')
   const [data, setData] = useState(hoje)
   const [observacao, setObservacao] = useState('')
 
@@ -73,7 +75,12 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
       setCartaoId(editando.cartaoId)
       setData(editando.data)
       setObservacao(editando.observacao ?? '')
-      if (editando.tipo === 'gasto') setCategoria(editando.categoria)
+      if (editando.tipo === 'gasto') {
+        const isFixed = CATEGORIAS.some(c => c.value === editando.categoria)
+        setCategoria(editando.categoria)
+        setCustomMode(!isFixed)
+        setCustomInput(isFixed ? '' : editando.categoria)
+      }
     } else {
       setTipo('gasto')
       setDescricao('')
@@ -81,6 +88,8 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
       setBancoId(bancos[0]?.id ?? '')
       setCartaoId(undefined)
       setCategoria('outros')
+      setCustomMode(false)
+      setCustomInput('')
       setData(hoje)
       setObservacao('')
     }
@@ -110,15 +119,17 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
       despesaFixa: false,
       ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
     }
+    const categoriaFinal = customMode && customInput.trim() ? customInput.trim() : categoria
     const input: TransacaoInput =
       tipo === 'gasto'
-        ? { ...base, tipo: 'gasto', categoria, ...(cartaoId ? { cartaoId } : {}) }
+        ? { ...base, tipo: 'gasto', categoria: categoriaFinal, ...(cartaoId ? { cartaoId } : {}) }
         : { ...base, tipo: 'entrada' }
     onSave(input)
     onClose()
   }
 
-  const canSave = descricao.trim().length > 0 && getCents() > 0 && !!bancoId
+  const categoriaValida = tipo !== 'gasto' || (customMode ? customInput.trim().length > 0 : true)
+  const canSave = descricao.trim().length > 0 && getCents() > 0 && !!bancoId && categoriaValida
 
   function focusInput(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
     e.target.style.borderColor = 'var(--border-strong)'
@@ -275,12 +286,12 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
                   <Label>Categoria</Label>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {CATEGORIAS.map(c => {
-                      const sel = categoria === c.value
+                      const sel = !customMode && categoria === c.value
                       return (
                         <button
                           key={c.value}
                           type="button"
-                          onClick={() => setCategoria(c.value)}
+                          onClick={() => { setCategoria(c.value); setCustomMode(false); setCustomInput('') }}
                           style={{
                             padding: '7px 12px', borderRadius: 99, fontSize: 12, fontWeight: 500,
                             cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s', letterSpacing: '-0.01em',
@@ -295,7 +306,35 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
                         </button>
                       )
                     })}
+                    {/* Chip personalizar */}
+                    <button
+                      type="button"
+                      onClick={() => { setCustomMode(true); setCategoria('') }}
+                      style={{
+                        padding: '7px 12px', borderRadius: 99, fontSize: 12, fontWeight: 500,
+                        cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s', letterSpacing: '-0.01em',
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        border: customMode ? '1px solid var(--text-primary)' : '1px dashed var(--border)',
+                        background: customMode ? 'var(--text-primary)' : 'transparent',
+                        color: customMode ? 'var(--bg-base)' : 'var(--text-tertiary)',
+                      }}
+                    >
+                      <span style={{ fontSize: 11 }}>✏️</span>
+                      Personalizar
+                    </button>
                   </div>
+                  {/* Input custom */}
+                  {customMode && (
+                    <input
+                      autoFocus
+                      value={customInput}
+                      onChange={e => setCustomInput(e.target.value)}
+                      placeholder="Ex: Gasolina, IPVA, Academia..."
+                      style={{ ...baseInput, marginTop: 10 }}
+                      onFocus={focusInput}
+                      onBlur={blurInput}
+                    />
+                  )}
                 </div>
               )}
 

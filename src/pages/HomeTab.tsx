@@ -6,7 +6,7 @@ import { ComparacaoMeses } from '@/components/Dashboard/ComparacaoMeses'
 import { ChartsPizza } from '@/components/Charts/ChartsPizza'
 import { ChartsBarBancos } from '@/components/Charts/ChartsBarBancos'
 import { ChartsLinhaDia } from '@/components/Charts/ChartsLinhaDia'
-import { Conta, ResumoMes, BancoComSaldo, CartaoComSaldo, CategoriaGasto } from '@/types'
+import { Conta, ResumoMes, BancoComSaldo, CartaoComSaldo } from '@/types'
 import { formatBRL } from '@/lib/utils'
 
 interface Props {
@@ -19,7 +19,7 @@ interface Props {
   totalSaldo: number
   totalGastos: number
   totalPendente: number
-  gastosPorCategoria: Record<CategoriaGasto, number>
+  gastosPorCategoria: Record<string, number>
   gastosPorDia: { data: string; total: number }[]
   onEditReceita: () => void
   onNavigateToBancos: () => void
