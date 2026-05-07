@@ -3,12 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Pencil, Trash2 } from 'lucide-react'
 import { Conta } from '@/types'
 import { formatBRL, getAlertaVencimento, getBillEmoji, getBillAvatarBg } from '@/lib/utils'
+import { ConfirmDeleteParcelaModal } from '@/components/Modals/ConfirmDeleteParcelaModal'
 
 interface Props {
   conta: Conta
   onTogglePago: (id: string, pago: boolean) => void
   onEdit: (conta: Conta) => void
   onDelete: (id: string) => void
+  onDeleteParcelamento?: (parcelamentoId: string, parcelaAtualFrom: number, parcelaTotal: number) => void
 }
 
 const FORMA_LABEL: Record<string, string> = {
@@ -18,8 +20,9 @@ const FORMA_LABEL: Record<string, string> = {
   credito: 'Crédito',
 }
 
-export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
+export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcelamento }: Props) {
   const [confirmando, setConfirmando] = useState(false)
+  const [confirmParcelaOpen, setConfirmParcelaOpen] = useState(false)
   const alerta = getAlertaVencimento(conta.vencimento, conta.pago)
   const emoji = getBillEmoji(conta.nome)
   const avatarBg = getBillAvatarBg(conta.nome)
@@ -99,6 +102,11 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
         >
           {conta.nome}
         </p>
+        {conta.pagamento && (
+          <p style={{ fontSize: 10, color: 'var(--green)', marginTop: 1, letterSpacing: '-0.01em' }}>
+            Pago em {new Date(conta.pagamento.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+          </p>
+        )}
         <p className="text-[11px] mt-[1px]" style={{ color: 'var(--text-tertiary)' }}>
           {FORMA_LABEL[conta.formaPagamento]}
         </p>
@@ -208,7 +216,13 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
               <Pencil className="w-[11px] h-[11px]" />
             </button>
             <button
-              onClick={() => setConfirmando(true)}
+              onClick={() => {
+                if (conta.parcelamentoId) {
+                  setConfirmParcelaOpen(true)
+                } else {
+                  setConfirmando(true)
+                }
+              }}
               className="w-6 h-6 rounded-md flex items-center justify-center transition-colors"
               style={{ color: 'var(--text-tertiary)' }}
               onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
@@ -219,6 +233,22 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {conta.parcelamentoId && (
+        <ConfirmDeleteParcelaModal
+          open={confirmParcelaOpen}
+          parcelaAtual={conta.parcelas?.atual ?? 1}
+          parcelaTotal={conta.parcelas?.total ?? 1}
+          onDeleteSo={() => { onDelete(conta.id); setConfirmParcelaOpen(false) }}
+          onDeleteRestantes={() => {
+            if (onDeleteParcelamento && conta.parcelamentoId && conta.parcelas) {
+              onDeleteParcelamento(conta.parcelamentoId, conta.parcelas.atual, conta.parcelas.total)
+            }
+            setConfirmParcelaOpen(false)
+          }}
+          onClose={() => setConfirmParcelaOpen(false)}
+        />
+      )}
     </motion.div>
   )
 }
