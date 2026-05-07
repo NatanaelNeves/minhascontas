@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
+import { X } from 'lucide-react'
 import { BancoComSaldo } from '@/types'
 import { formatBRL } from '@/lib/utils'
 
@@ -31,6 +32,18 @@ export function PagarContaModal({
       setData(new Date().toISOString().split('T')[0])
       setBancoId(bancos[0]?.id ?? '')
     }
+  }, [open, bancos])
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [open, onClose])
+
+  useEffect(() => {
+    document.body.style.overflow = open ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
   }, [open])
 
   const canConfirm = !!bancoId && !!data
@@ -44,47 +57,76 @@ export function PagarContaModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
+            transition={{ duration: 0.22 }}
             onClick={onClose}
             style={{
-              position: 'fixed', inset: 0, zIndex: 60,
-              background: 'rgba(0,0,0,0.7)',
-              backdropFilter: 'blur(4px)',
-              WebkitBackdropFilter: 'blur(4px)',
+              position: 'fixed',
+              inset: 0,
+              zIndex: 50,
+              background: 'rgba(0,0,0,0.65)',
+              backdropFilter: 'blur(6px)',
+              WebkitBackdropFilter: 'blur(6px)',
             }}
           />
+
           <motion.div
-            key="modal"
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+            key="sheet"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             style={{
-              position: 'fixed', zIndex: 61,
-              left: '50%', top: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 'min(360px, calc(100vw - 32px))',
+              position: 'fixed',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 51,
+              width: 'min(420px, 100vw)',
               background: 'var(--bg-elevated)',
-              border: '0.5px solid var(--border)',
-              borderRadius: 16,
-              overflow: 'hidden',
+              borderLeft: '0.5px solid var(--border)',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
             {/* Header */}
-            <div style={{ padding: '20px 20px 16px', borderBottom: '0.5px solid var(--border)' }}>
-              <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 4 }}>
-                Registrar pagamento
-              </p>
-              <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: 2 }}>
-                {contaNome}
-              </p>
-              <p style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>
-                {formatBRL(contaValor)}
-              </p>
+            <div
+              style={{
+                padding: '18px 22px',
+                borderBottom: '0.5px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexShrink: 0,
+              }}
+            >
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 4 }}>
+                  Registrar pagamento
+                </p>
+                <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+                  {contaNome}
+                </p>
+                <p style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
+                  {formatBRL(contaValor)}
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                style={{
+                  width: 32, height: 32, borderRadius: 99,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '0.5px solid var(--border)',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <X size={14} />
+              </button>
             </div>
 
             {/* Body */}
-            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '22px', display: 'flex', flexDirection: 'column', gap: 24 }}>
               {/* Data */}
               <div>
                 <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 8 }}>
@@ -118,15 +160,15 @@ export function PagarContaModal({
                   Débitar de
                 </p>
                 {bancos.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '12px 0' }}>
-                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 10 }}>
+                  <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
                       Nenhum banco cadastrado.
                     </p>
                     {onNavigateToBancos && (
                       <button
                         onClick={() => { onClose(); onNavigateToBancos() }}
                         style={{
-                          padding: '8px 18px', borderRadius: 99, fontSize: 13, fontWeight: 600,
+                          padding: '9px 20px', borderRadius: 99, fontSize: 13, fontWeight: 600,
                           background: 'var(--text-primary)', color: 'var(--bg-base)',
                           border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                         }}
@@ -136,14 +178,14 @@ export function PagarContaModal({
                     )}
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {bancos.map(b => (
                       <button
                         key={b.id}
                         onClick={() => setBancoId(b.id)}
                         style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '10px 14px', borderRadius: 10,
+                          padding: '12px 14px', borderRadius: 10,
                           background: bancoId === b.id ? 'var(--text-primary)' : 'var(--bg-surface)',
                           border: bancoId === b.id ? '1px solid var(--text-primary)' : '1px solid var(--border)',
                           cursor: 'pointer', fontFamily: 'inherit',
@@ -152,10 +194,10 @@ export function PagarContaModal({
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           {b.cor && (
-                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: b.cor, flexShrink: 0 }} />
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: b.cor, flexShrink: 0 }} />
                           )}
                           <span style={{
-                            fontSize: 13, fontWeight: 500,
+                            fontSize: 14, fontWeight: 500,
                             color: bancoId === b.id ? 'var(--bg-base)' : 'var(--text-primary)',
                           }}>
                             {b.nome}
@@ -175,17 +217,23 @@ export function PagarContaModal({
             </div>
 
             {/* Footer */}
-            <div style={{ padding: '0 16px 16px', display: 'flex', gap: 8 }}>
+            <div
+              style={{
+                padding: '16px 22px',
+                borderTop: '0.5px solid var(--border)',
+                display: 'flex',
+                gap: 10,
+                flexShrink: 0,
+              }}
+            >
               <button
                 onClick={onClose}
                 style={{
-                  flex: 1, padding: '11px', borderRadius: 10,
+                  flex: 1, padding: '12px', borderRadius: 10,
                   background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                  color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500,
-                  fontFamily: 'inherit', cursor: 'pointer', transition: 'color .15s',
+                  color: 'var(--text-secondary)', fontSize: 14, fontWeight: 500,
+                  fontFamily: 'inherit', cursor: 'pointer',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
               >
                 Cancelar
               </button>
@@ -193,11 +241,11 @@ export function PagarContaModal({
                 onClick={() => { if (canConfirm) { onConfirm(bancoId, data); onClose() } }}
                 disabled={!canConfirm}
                 style={{
-                  flex: 2, padding: '11px', borderRadius: 10,
+                  flex: 2, padding: '12px', borderRadius: 10,
                   background: canConfirm ? 'var(--green)' : 'rgba(255,255,255,0.06)',
                   border: 'none',
                   color: canConfirm ? '#fff' : 'var(--text-tertiary)',
-                  fontSize: 13, fontWeight: 600,
+                  fontSize: 14, fontWeight: 600,
                   fontFamily: 'inherit', cursor: canConfirm ? 'pointer' : 'not-allowed',
                   transition: 'all .2s', letterSpacing: '-0.01em',
                 }}

@@ -43,7 +43,7 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcel
     >
       {/* Checkbox toggle */}
       <button
-        onClick={() => onTogglePago(conta.id, !conta.pago)}
+        onClick={() => onTogglePago(conta.id, conta.pago)}
         className="w-[18px] h-[18px] rounded-[5px] flex-shrink-0 flex items-center justify-center transition-all"
         style={
           conta.pago
