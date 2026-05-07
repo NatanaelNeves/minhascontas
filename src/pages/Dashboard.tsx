@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { FileDown } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useBills } from '@/hooks/useBills'
@@ -6,6 +6,8 @@ import { useMonth } from '@/hooks/useMonth'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useBanks } from '@/hooks/useBanks'
 import { useReceivables } from '@/hooks/useReceivables'
+import { useCartoes } from '@/hooks/useCartoes'
+import { useFaturas } from '@/hooks/useFaturas'
 import { useAppStore } from '@/store/useAppStore'
 import { Header } from '@/components/ui/Header'
 import { BottomNav } from '@/components/BottomNav/BottomNav'
@@ -16,10 +18,11 @@ import { ContasTab } from './ContasTab'
 import { GastosTab } from './GastosTab'
 import { BancosTab } from './BancosTab'
 import { ReceberTab } from './ReceberTab'
-import { AbaAtiva } from '@/types'
+import { CartoesTab } from './CartoesTab'
+import { AbaAtiva, CartaoComSaldo, ContaInput } from '@/types'
 import { prevMesId } from '@/lib/utils'
 import { db } from '@/lib/firebase'
-import { doc, deleteDoc } from 'firebase/firestore'
+import { doc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore'
 
 export function Dashboard({ userId }: { userId: string }) {
   const { mesAtivo, abaAtiva, setAbaAtiva } = useAppStore()
@@ -31,6 +34,8 @@ export function Dashboard({ userId }: { userId: string }) {
     criarMes,
     copiarFixos,
     mesExiste,
+    criarContaComParcelas,
+    excluirParcelamentosRestantes,
   } = useMonth(userId)
 
   const {
@@ -46,7 +51,6 @@ export function Dashboard({ userId }: { userId: string }) {
   const {
     transacoes,
     totalGastos,
-    totalEntradas,
     gastosPorCategoria,
     gastosPorDia,
     addTransacao,
@@ -69,6 +73,47 @@ export function Dashboard({ userId }: { userId: string }) {
     marcarRecebido,
     desmarcarRecebido,
   } = useReceivables(userId, mesAtivo)
+
+  const { cartoes, addCartao, updateCartao, deleteCartao } = useCartoes(userId)
+  const { faturas, criarFatura, marcarFaturaPaga, desmarcarFaturaPaga } = useFaturas(userId, mesAtivo, cartoes)
+
+  const cartoesComSaldo = useMemo<CartaoComSaldo[]>(() => {
+    return cartoes.map(cartao => {
+      const totalUsado = transacoes
+        .filter(t => t.cartaoId === cartao.id && t.tipo === 'gasto')
+        .reduce((sum, t) => sum + t.valor, 0)
+      const limiteDisponivel = cartao.limite - totalUsado
+      const percentualUsado = cartao.limite > 0 ? (totalUsado / cartao.limite) * 100 : 0
+      return { ...cartao, totalUsado, limiteDisponivel, percentualUsado }
+    })
+  }, [cartoes, transacoes])
+
+  const autoFaturaRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!mesAtivo || !userId || cartoes.length === 0) return
+    const prevId = prevMesId(mesAtivo)
+    const creditCartoes = cartoes.filter(c => c.tipo === 'credito')
+    creditCartoes.forEach(async (cartao) => {
+      const key = `${mesAtivo}_${cartao.id}`
+      if (autoFaturaRef.current.has(key)) return
+      if (faturas.find(f => f.cartaoId === cartao.id)) {
+        autoFaturaRef.current.add(key)
+        return
+      }
+      autoFaturaRef.current.add(key)
+      const txPath = `users/${userId}/months/${prevId}/transactions`
+      const snap = await getDocs(query(
+        collection(db, txPath),
+        where('cartaoId', '==', cartao.id),
+        where('tipo', '==', 'gasto'),
+      ))
+      const total = snap.docs.reduce((sum, d) => sum + ((d.data().valor as number) ?? 0), 0)
+      if (total > 0) {
+        await criarFatura(cartao.id, prevId, mesAtivo, total)
+      }
+    })
+  }, [mesAtivo, cartoes, faturas, userId])
 
   const [receitaModalOpen, setReceitaModalOpen] = useState(false)
   const [copiarModalOpen, setCopiarModalOpen] = useState(false)
@@ -102,6 +147,18 @@ export function Dashboard({ userId }: { userId: string }) {
     })
   }, [transacoes, recebiveis, userId, mesAtivo])
 
+  async function handleSaveParcelada(data: ContaInput, parcelaTotal: number) {
+    await criarContaComParcelas(data, parcelaTotal, mesAtivo)
+  }
+
+  async function handleDeleteParcelamento(
+    parcelamentoId: string,
+    parcelaAtualFrom: number,
+    parcelaTotal: number,
+  ) {
+    await excluirParcelamentosRestantes(parcelamentoId, parcelaAtualFrom, parcelaTotal, mesAtivo)
+  }
+
   async function handleCopiarFixos() {
     await criarMes(mesAtivo, 0)
     await copiarFixos(mesOrigemId, mesAtivo)
@@ -133,6 +190,7 @@ export function Dashboard({ userId }: { userId: string }) {
     gastos: 'Novo lançamento',
     bancos: 'Novo banco',
     receber: 'Novo a receber',
+    cartoes: 'Novo cartão',
   }
 
   function handleFAB() {
@@ -157,35 +215,44 @@ export function Dashboard({ userId }: { userId: string }) {
           >
             {abaAtiva === 'home' && (
               <HomeTab
+                userId={userId}
                 resumo={resumo}
                 receita={mesInfo?.receita ?? 0}
                 contas={contas}
                 bancos={bancos}
+                cartoesComSaldo={cartoesComSaldo}
                 totalSaldo={totalSaldo}
                 totalGastos={totalGastos}
-                totalEntradas={totalEntradas}
                 totalPendente={totalPendente}
                 gastosPorCategoria={gastosPorCategoria}
                 gastosPorDia={gastosPorDia}
                 onEditReceita={() => setReceitaModalOpen(true)}
+                onNavigateToBancos={() => setAbaAtiva('bancos')}
               />
             )}
             {abaAtiva === 'contas' && (
               <ContasTab
                 contas={contas}
                 bancos={bancos}
+                faturas={faturas}
+                cartoes={cartoes}
                 onTogglePagoComBanco={togglePagoComBanco}
                 onDesfazerPagamento={desfazerPagamento}
                 onDelete={deleteConta}
                 onAdd={addConta}
                 onUpdate={updateConta}
+                onSaveParcelada={handleSaveParcelada}
+                onDeleteParcelamento={handleDeleteParcelamento}
                 onNavigateToBancos={() => setAbaAtiva('bancos')}
+                onMarcarFaturaPaga={marcarFaturaPaga}
+                onDesmarcarFaturaPaga={desmarcarFaturaPaga}
               />
             )}
             {abaAtiva === 'gastos' && (
               <GastosTab
                 transacoes={transacoes}
                 bancos={bancos}
+                cartoes={cartoes}
                 onAdd={addTransacao}
                 onUpdate={updateTransacao}
                 onDelete={deleteTransacao}
@@ -208,6 +275,18 @@ export function Dashboard({ userId }: { userId: string }) {
                 onDelete={deleteRecebivel}
                 onMarcarRecebido={marcarRecebido}
                 onDesmarcarRecebido={desmarcarRecebido}
+                onNavigateToBancos={() => setAbaAtiva('bancos')}
+              />
+            )}
+            {abaAtiva === 'cartoes' && (
+              <CartoesTab
+                cartoes={cartoesComSaldo}
+                faturas={faturas}
+                bancos={bancos}
+                onAdd={addCartao}
+                onUpdate={updateCartao}
+                onDelete={deleteCartao}
+                onMarcarFaturaPaga={marcarFaturaPaga}
                 onNavigateToBancos={() => setAbaAtiva('bancos')}
               />
             )}
