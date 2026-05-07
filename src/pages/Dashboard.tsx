@@ -18,6 +18,8 @@ import { BancosTab } from './BancosTab'
 import { ReceberTab } from './ReceberTab'
 import { AbaAtiva } from '@/types'
 import { prevMesId } from '@/lib/utils'
+import { db } from '@/lib/firebase'
+import { doc, deleteDoc } from 'firebase/firestore'
 
 export function Dashboard({ userId }: { userId: string }) {
   const { mesAtivo, abaAtiva, setAbaAtiva } = useAppStore()
@@ -87,6 +89,18 @@ export function Dashboard({ userId }: { userId: string }) {
       }
     })
   }, [mesAtivo, mesInfo, isMonthLoading])
+
+  // Clean up orphaned receivable transactions whose receivable was deleted
+  useEffect(() => {
+    if (!userId || !mesAtivo || transacoes.length === 0) return
+    const receivableIds = new Set(recebiveis.map(r => r.id))
+    const txPath = `users/${userId}/months/${mesAtivo}/transactions`
+    transacoes.forEach(t => {
+      if (t.origem?.tipo === 'receivable' && !receivableIds.has(t.origem.id)) {
+        deleteDoc(doc(db, txPath, t.id))
+      }
+    })
+  }, [transacoes, recebiveis, userId, mesAtivo])
 
   async function handleCopiarFixos() {
     await criarMes(mesAtivo, 0)
