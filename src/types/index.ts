@@ -17,6 +17,8 @@ export interface Conta {
   vencimento: string | null
   pago: boolean
   parcelas: Parcelas | null
+  parcelamentoId?: string
+  pagamento?: { data: string; bancoId: string }
   criadoEm: Date
 }
 
@@ -48,6 +50,7 @@ export interface Banco {
   id: string
   nome: string
   saldoInicial: number
+  cor?: string
   criadoEm: Date
 }
 
@@ -86,6 +89,7 @@ type TransacaoBase = {
   valor: number
   despesaFixa: boolean
   observacao?: string
+  cartaoId?: string
   origem?: TransacaoOrigem
   criadoEm: Date
 }
@@ -101,8 +105,46 @@ type TransacaoEntrada = TransacaoBase & {
 }
 
 export type Transacao = TransacaoGasto | TransacaoEntrada
-export type AbaAtiva = 'home' | 'contas' | 'gastos' | 'bancos' | 'receber'
+export type AbaAtiva = 'home' | 'contas' | 'gastos' | 'bancos' | 'receber' | 'cartoes'
 
 export type TransacaoInput = Omit<Transacao, 'id' | 'criadoEm'>
 export type BancoInput = Omit<Banco, 'id' | 'criadoEm'>
 export type AReceberInput = Omit<AReceber, 'id' | 'criadoEm'>
+
+// --- Cartões de Crédito e Benefícios ---
+
+export type TipoCartao =
+  | 'credito'
+  | 'vale_alimentacao'
+  | 'vale_combustivel'
+  | 'vale_refeicao'
+  | 'outros_beneficios'
+
+export interface Cartao {
+  id: string
+  nome: string
+  tipo: TipoCartao
+  limite: number
+  diaFechamento: number
+  diaVencimento: number
+  cor: string
+  criadoEm: Date
+}
+
+export type CartaoInput = Omit<Cartao, 'id' | 'criadoEm'>
+
+export interface CartaoComSaldo extends Cartao {
+  totalUsado: number
+  limiteDisponivel: number
+  percentualUsado: number
+}
+
+export interface FaturaCartao {
+  id: string
+  cartaoId: string
+  mesReferencia: string
+  mesVencimento: string
+  total: number
+  pago: boolean
+  criadoEm: Date
+}
