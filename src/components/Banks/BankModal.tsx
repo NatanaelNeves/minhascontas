@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { Banco, BancoInput } from '@/types'
+import { Banco, BancoInput, TipoBanco } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { formatMesLabel, centavosToDisplay, valorToCentStr } from '@/lib/utils'
 
@@ -44,19 +44,27 @@ interface Props {
   onClose: () => void
 }
 
+const TIPOS: { value: TipoBanco; label: string; descricao: string }[] = [
+  { value: 'corrente', label: '💰 Conta', descricao: 'Conta corrente, poupança, carteira digital' },
+  { value: 'investimento', label: '📈 Investimento', descricao: 'CDB, Tesouro, fundos, ações, cripto' },
+]
+
 export function BankModal({ open, editando, onSave, onClose }: Props) {
   const { mesAtivo } = useAppStore()
   const [nome, setNome] = useState('')
+  const [tipo, setTipo] = useState<TipoBanco>('corrente')
   const [centStr, setCentStr] = useState('')
   const [cor, setCor] = useState(CORES[0])
 
   useEffect(() => {
     if (editando) {
       setNome(editando.nome)
+      setTipo(editando.tipo ?? 'corrente')
       setCentStr(valorToCentStr(editando.saldoInicial))
       setCor(editando.cor ?? CORES[0])
     } else {
       setNome('')
+      setTipo('corrente')
       setCentStr('')
       setCor(CORES[0])
     }
@@ -76,7 +84,7 @@ export function BankModal({ open, editando, onSave, onClose }: Props) {
 
   function handleSave() {
     if (!nome.trim()) return
-    onSave({ nome: nome.trim(), saldoInicial: parseInt(centStr || '0', 10) / 100, cor })
+    onSave({ nome: nome.trim(), tipo, saldoInicial: parseInt(centStr || '0', 10) / 100, cor })
     onClose()
   }
 
@@ -153,7 +161,7 @@ export function BankModal({ open, editando, onSave, onClose }: Props) {
                 <input
                   value={nome}
                   onChange={e => setNome(e.target.value)}
-                  placeholder="ex: Nubank, Itaú, Carteira..."
+                  placeholder={tipo === 'investimento' ? 'ex: Tesouro Direto, CDB Nubank...' : 'ex: Nubank, Itaú, Carteira...'}
                   autoFocus
                   style={baseInput}
                   onFocus={focusInput}
@@ -161,9 +169,36 @@ export function BankModal({ open, editando, onSave, onClose }: Props) {
                 />
               </div>
 
-              {/* Saldo Inicial */}
+              {/* Tipo */}
               <div>
-                <Label>Saldo inicial (R$)</Label>
+                <Label>Tipo</Label>
+                <div style={{ display: 'flex', gap: 3, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 3 }}>
+                  {TIPOS.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setTipo(opt.value)}
+                      style={{
+                        flex: 1, padding: '9px 6px', borderRadius: 7, fontSize: 13, fontWeight: 500,
+                        textAlign: 'center', cursor: 'pointer', border: 'none', fontFamily: 'inherit',
+                        transition: 'all .15s',
+                        background: tipo === opt.value ? (opt.value === 'investimento' ? 'var(--purple)' : 'var(--text-primary)') : 'transparent',
+                        color: tipo === opt.value ? (opt.value === 'investimento' ? '#fff' : 'var(--bg-base)') : 'var(--text-secondary)',
+                        letterSpacing: '-0.01em',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 7 }}>
+                  {TIPOS.find(t => t.value === tipo)?.descricao}
+                </p>
+              </div>
+
+              {/* Saldo / Valor investido */}
+              <div>
+                <Label>{tipo === 'investimento' ? 'Valor investido (R$)' : 'Saldo inicial (R$)'}</Label>
                 <div style={{ position: 'relative' }}>
                   <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)', pointerEvents: 'none', userSelect: 'none' }}>
                     R$

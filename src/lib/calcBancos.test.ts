@@ -5,6 +5,7 @@ import { Banco, Transacao } from '@/types'
 const makeBanco = (overrides: Partial<Banco> = {}): Banco => ({
   id: 'b1',
   nome: 'Nubank',
+  tipo: 'corrente',
   saldoInicial: 1000,
   criadoEm: new Date(),
   ...overrides,

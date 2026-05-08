@@ -14,13 +14,14 @@ import {
   DocumentData,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Banco, BancoInput, BancoComSaldo, Transacao } from '@/types'
+import { Banco, BancoInput, BancoComSaldo, TipoBanco, Transacao } from '@/types'
 
 function docToBanco(snap: QueryDocumentSnapshot<DocumentData>): Banco {
   const d = snap.data()
   return {
     id: snap.id,
     nome: d.nome,
+    tipo: (d.tipo as TipoBanco) ?? 'corrente',
     saldoInicial: d.saldoInicial,
     cor: d.cor ?? undefined,
     criadoEm: d.criadoEm?.toDate() ?? new Date(),
@@ -30,6 +31,8 @@ function docToBanco(snap: QueryDocumentSnapshot<DocumentData>): Banco {
 export interface UseBanksReturn {
   bancos: BancoComSaldo[]
   totalSaldo: number
+  totalInvestido: number
+  bancosPorTipo: { corrente: BancoComSaldo[]; investimento: BancoComSaldo[] }
   isLoading: boolean
   addBanco: (b: BancoInput) => Promise<void>
   updateBanco: (id: string, data: Partial<BancoInput>) => Promise<void>
@@ -70,7 +73,7 @@ export function useBanks(
         for (const bankDoc of banksSnap.docs) {
           const d = bankDoc.data()
           if (!bancosByName.has(d.nome)) {
-            bancosByName.set(d.nome, { nome: d.nome, saldoInicial: d.saldoInicial, cor: d.cor })
+            bancosByName.set(d.nome, { nome: d.nome, tipo: 'corrente', saldoInicial: d.saldoInicial, cor: d.cor })
           }
         }
       }
@@ -97,6 +100,9 @@ export function useBanks(
   const bancos = useMemo<BancoComSaldo[]>(
     () =>
       bancosRaw.map(b => {
+        if (b.tipo === 'investimento') {
+          return { ...b, gastos: 0, entradas: 0, saldoAtual: b.saldoInicial }
+        }
         const txs = porBanco[b.id] ?? []
         const gastos = txs
           .filter(t => t.tipo === 'gasto' && !t.cartaoId)
@@ -110,9 +116,19 @@ export function useBanks(
   )
 
   const totalSaldo = useMemo(
-    () => bancos.reduce((s, b) => s + b.saldoAtual, 0),
+    () => bancos.filter(b => b.tipo === 'corrente').reduce((s, b) => s + b.saldoAtual, 0),
     [bancos],
   )
+
+  const totalInvestido = useMemo(
+    () => bancos.filter(b => b.tipo === 'investimento').reduce((s, b) => s + b.saldoAtual, 0),
+    [bancos],
+  )
+
+  const bancosPorTipo = useMemo(() => ({
+    corrente: bancos.filter(b => b.tipo === 'corrente'),
+    investimento: bancos.filter(b => b.tipo === 'investimento'),
+  }), [bancos])
 
   async function addBanco(b: BancoInput) {
     await addDoc(collection(db, path), { ...b, criadoEm: serverTimestamp() })
@@ -129,5 +145,5 @@ export function useBanks(
     return null
   }
 
-  return { bancos, totalSaldo, isLoading, addBanco, updateBanco, deleteBanco }
+  return { bancos, totalSaldo, totalInvestido, bancosPorTipo, isLoading, addBanco, updateBanco, deleteBanco }
 }

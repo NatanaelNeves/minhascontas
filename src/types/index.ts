@@ -48,9 +48,12 @@ export type ContaInput = Omit<Conta, "id" | "criadoEm">
 
 // --- Expansão: Bancos, Transações, A Receber ---
 
+export type TipoBanco = 'corrente' | 'investimento'
+
 export interface Banco {
   id: string
   nome: string
+  tipo: TipoBanco
   saldoInicial: number
   cor?: string
   criadoEm: Date

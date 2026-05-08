@@ -60,7 +60,7 @@ export function Dashboard({ userId }: { userId: string }) {
     deleteTransacao,
   } = useTransactions(userId, mesAtivo)
 
-  const { bancos, totalSaldo, addBanco, updateBanco, deleteBanco } = useBanks(
+  const { bancos, addBanco, updateBanco, deleteBanco } = useBanks(
     userId,
     transacoes,
   )
@@ -247,7 +247,6 @@ export function Dashboard({ userId }: { userId: string }) {
                 contas={contas}
                 bancos={bancos}
                 cartoesComSaldo={cartoesComSaldo}
-                totalSaldo={totalSaldo}
                 totalGastos={totalGastos}
                 totalPendente={totalPendente}
                 nRecebiveis={recebiveis.length}

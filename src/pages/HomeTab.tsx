@@ -18,7 +18,6 @@ interface Props {
   contas: Conta[]
   bancos: BancoComSaldo[]
   cartoesComSaldo: CartaoComSaldo[]
-  totalSaldo: number
   totalGastos: number
   totalPendente: number
   nRecebiveis: number
@@ -36,7 +35,6 @@ export function HomeTab({
   contas,
   bancos,
   cartoesComSaldo,
-  totalSaldo,
   totalGastos,
   totalPendente,
   nRecebiveis,
@@ -59,10 +57,9 @@ export function HomeTab({
   return (
     <div className="flex flex-col gap-4">
       <SaldoPatrimonial
-        totalSaldo={totalSaldo}
+        bancos={bancos}
         cartoesComSaldo={cartoesComSaldo}
         onNavigateToBancos={onNavigateToBancos}
-        semBancos={bancos.length === 0}
       />
 
       <HomeResumoMes

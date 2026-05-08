@@ -213,7 +213,9 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
   }
 
   function getCents(): number {
-    return temParcelas ? getParcelaCents() : parseInt(centStr || '0', 10)
+    if (!temParcelas) return parseInt(centStr || '0', 10)
+    if (form.categoria === 'fixo') return parseInt(centStr || '0', 10)
+    return getParcelaCents()
   }
 
   const valorTotalReais = getValorTotalCents() / 100
@@ -517,107 +519,197 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
                     exit={{ opacity: 0, height: 0 }}
                     style={{ overflow: 'hidden' }}
                   >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                      {/* Valor total */}
-                      <div>
-                        <Label>Valor total do bem</Label>
-                        <div style={{ position: 'relative' }}>
-                          <span style={{
-                            position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
-                            fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)',
-                            pointerEvents: 'none', userSelect: 'none',
+                    {form.categoria === 'fixo' ? (
+                      // Fixo parcelado: financiamento/empréstimo — valor mensal direto
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <div>
+                          <Label>Valor da parcela</Label>
+                          <div style={{ position: 'relative' }}>
+                            <span style={{
+                              position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+                              fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)',
+                              pointerEvents: 'none', userSelect: 'none',
+                            }}>
+                              R$
+                            </span>
+                            <input
+                              value={centavosToDisplay(centStr)}
+                              onChange={e => setCentStr(e.target.value.replace(/\D/g, ''))}
+                              placeholder="0,00"
+                              inputMode="numeric"
+                              style={{ ...baseInput, paddingLeft: 46, fontSize: 28, fontWeight: 700, letterSpacing: '-0.05em', height: 58 }}
+                              onFocus={focusInput}
+                              onBlur={blurInput}
+                            />
+                          </div>
+                        </div>
+
+                        {!editando && (
+                          <div>
+                            <Label>Começou em qual mês?</Label>
+                            <select
+                              value={mesInicio}
+                              onChange={e => setMesInicio(e.target.value)}
+                              style={{ ...baseInput, colorScheme: 'dark' }}
+                            >
+                              <option value="">Mês atual (parcela 1)</option>
+                              {mesOptions.slice(0, -1).reverse().map(m => (
+                                <option key={m} value={m}>{mesIdToShortLabel(m)}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          <div>
+                            <Label>Nº de parcelas</Label>
+                            <input
+                              type="number"
+                              min={2}
+                              max={480}
+                              value={parcelasTotal}
+                              onChange={e => setParcelasTotal(Math.max(2, Number(e.target.value)))}
+                              style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
+                            />
+                          </div>
+                          <div>
+                            <Label>Parcela atual</Label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={parcelasTotal}
+                              value={parcelaAtual}
+                              onChange={e => setParcelaAtual(Math.min(parcelasTotal, Math.max(1, Number(e.target.value))))}
+                              style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
+                            />
+                          </div>
+                        </div>
+
+                        {getCents() > 0 && parcelasTotal >= 2 && (
+                          <div style={{
+                            padding: '12px 14px', borderRadius: 10,
+                            background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
                           }}>
-                            R$
-                          </span>
-                          <input
-                            value={centavosToDisplay(valorTotalCentStr)}
-                            onChange={e => setValorTotalCentStr(e.target.value.replace(/\D/g, ''))}
-                            placeholder="0,00"
-                            inputMode="numeric"
-                            style={{ ...baseInput, paddingLeft: 46, fontSize: 28, fontWeight: 700, letterSpacing: '-0.05em', height: 58 }}
-                            onFocus={focusInput}
-                            onBlur={blurInput}
-                          />
-                        </div>
+                            <div>
+                              <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 2 }}>
+                                Total restante
+                              </p>
+                              <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                                Termina {mesIdToShortLabel(mesIdAddMeses(mesAtivo, parcelasTotal - parcelaAtual))}
+                              </p>
+                            </div>
+                            <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                              {formatBRL((parcelasTotal - parcelaAtual + 1) * (getCents() / 100))}
+                            </p>
+                          </div>
+                        )}
+
+                        {!editando && getCents() > 0 && (
+                          <p style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
+                            {parcelasTotal - parcelaAtual + 1} parcelas serão criadas automaticamente.
+                          </p>
+                        )}
                       </div>
+                    ) : (
+                      // Cartão parcelado: valor total do bem → deriva valor da parcela
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <div>
+                          <Label>Valor total do bem</Label>
+                          <div style={{ position: 'relative' }}>
+                            <span style={{
+                              position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+                              fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)',
+                              pointerEvents: 'none', userSelect: 'none',
+                            }}>
+                              R$
+                            </span>
+                            <input
+                              value={centavosToDisplay(valorTotalCentStr)}
+                              onChange={e => setValorTotalCentStr(e.target.value.replace(/\D/g, ''))}
+                              placeholder="0,00"
+                              inputMode="numeric"
+                              style={{ ...baseInput, paddingLeft: 46, fontSize: 28, fontWeight: 700, letterSpacing: '-0.05em', height: 58 }}
+                              onFocus={focusInput}
+                              onBlur={blurInput}
+                            />
+                          </div>
+                        </div>
 
-                      {/* Mês de início — só para novas contas */}
-                      {!editando && (
-                        <div>
-                          <Label>Começou em qual mês?</Label>
-                          <select
-                            value={mesInicio}
-                            onChange={e => setMesInicio(e.target.value)}
-                            style={{ ...baseInput, colorScheme: 'dark' }}
-                          >
-                            <option value="">Mês atual (parcela 1)</option>
-                            {mesOptions.slice(0, -1).reverse().map(m => (
-                              <option key={m} value={m}>{mesIdToShortLabel(m)}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+                        {!editando && (
+                          <div>
+                            <Label>Começou em qual mês?</Label>
+                            <select
+                              value={mesInicio}
+                              onChange={e => setMesInicio(e.target.value)}
+                              style={{ ...baseInput, colorScheme: 'dark' }}
+                            >
+                              <option value="">Mês atual (parcela 1)</option>
+                              {mesOptions.slice(0, -1).reverse().map(m => (
+                                <option key={m} value={m}>{mesIdToShortLabel(m)}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
 
-                      {/* Número de parcelas + parcela atual — lado a lado */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                        <div>
-                          <Label>Nº de parcelas</Label>
-                          <input
-                            type="number"
-                            min={2}
-                            max={120}
-                            value={parcelasTotal}
-                            onChange={e => setParcelasTotal(Math.max(2, Number(e.target.value)))}
-                            style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
-                          />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          <div>
+                            <Label>Nº de parcelas</Label>
+                            <input
+                              type="number"
+                              min={2}
+                              max={120}
+                              value={parcelasTotal}
+                              onChange={e => setParcelasTotal(Math.max(2, Number(e.target.value)))}
+                              style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
+                            />
+                          </div>
+                          <div>
+                            <Label>Parcela atual</Label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={parcelasTotal}
+                              value={parcelaAtual}
+                              onChange={e => setParcelaAtual(Math.min(parcelasTotal, Math.max(1, Number(e.target.value))))}
+                              style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <Label>Parcela atual</Label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={parcelasTotal}
-                            value={parcelaAtual}
-                            onChange={e => setParcelaAtual(Math.min(parcelasTotal, Math.max(1, Number(e.target.value))))}
-                            style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
-                          />
-                        </div>
+
+                        {getValorTotalCents() > 0 && parcelasTotal >= 2 && (
+                          <div style={{
+                            padding: '12px 14px', borderRadius: 10,
+                            background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          }}>
+                            <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+                              Valor de cada parcela
+                            </p>
+                            <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>
+                              {formatBRL(valorParcelaReais)}
+                            </p>
+                          </div>
+                        )}
+
+                        {divergencia && (
+                          <div style={{
+                            padding: '10px 14px', borderRadius: 10,
+                            background: 'var(--amber-muted)', border: '1px solid rgba(245,158,11,0.25)',
+                          }}>
+                            <p style={{ fontSize: 12, color: 'var(--amber)', lineHeight: 1.4 }}>
+                              Atenção: valor total ÷ parcelas ≠ valor da parcela (diferença de centavos por arredondamento)
+                            </p>
+                          </div>
+                        )}
+
+                        {!editando && (
+                          <p style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
+                            {parcelasTotal - parcelaAtual + 1} parcelas serão criadas automaticamente a partir do mês atual.
+                          </p>
+                        )}
                       </div>
-
-                      {/* Valor de cada parcela — read-only */}
-                      {getValorTotalCents() > 0 && parcelasTotal >= 2 && (
-                        <div style={{
-                          padding: '12px 14px', borderRadius: 10,
-                          background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        }}>
-                          <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-                            Valor de cada parcela
-                          </p>
-                          <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>
-                            {formatBRL(valorParcelaReais)}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Divergência */}
-                      {divergencia && (
-                        <div style={{
-                          padding: '10px 14px', borderRadius: 10,
-                          background: 'var(--amber-muted)', border: '1px solid rgba(245,158,11,0.25)',
-                        }}>
-                          <p style={{ fontSize: 12, color: 'var(--amber)', lineHeight: 1.4 }}>
-                            Atenção: valor total ÷ parcelas ≠ valor da parcela (diferença de centavos por arredondamento)
-                          </p>
-                        </div>
-                      )}
-
-                      {!editando && (
-                        <p style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
-                          {parcelasTotal - parcelaAtual + 1} parcelas serão criadas automaticamente a partir do mês atual.
-                        </p>
-                      )}
-                    </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -668,8 +760,8 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
                 </div>
               )}
 
-              {/* Parcelado — toggle (apenas para categoria 'cartao') */}
-              {form.categoria === 'cartao' && (
+              {/* Parcelado — toggle (cartão ou fixo) */}
+              {(form.categoria === 'cartao' || form.categoria === 'fixo') && (
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '12px 14px', background: 'var(--bg-surface)',
