@@ -27,6 +27,7 @@ function docToConta(snapshot: QueryDocumentSnapshot<DocumentData>): Conta {
     parcelamentoId: data.parcelamentoId ?? undefined,
     cartaoId: data.cartaoId ?? undefined,
     pagamento: data.pagamento ?? undefined,
+    recorrente: data.recorrente ?? undefined,
     criadoEm: data.criadoEm?.toDate() ?? new Date(),
   }
 }

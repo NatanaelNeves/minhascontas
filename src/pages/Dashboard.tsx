@@ -21,6 +21,7 @@ import { ReceberTab } from './ReceberTab'
 import { CartoesTab } from './CartoesTab'
 import { AbaAtiva, CartaoComSaldo, ContaInput } from '@/types'
 import { prevMesId } from '@/lib/utils'
+import { recargaEmBreve } from '@/lib/cartoes'
 import { db } from '@/lib/firebase'
 import { doc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore'
 
@@ -61,7 +62,6 @@ export function Dashboard({ userId }: { userId: string }) {
 
   const { bancos, totalSaldo, addBanco, updateBanco, deleteBanco } = useBanks(
     userId,
-    mesAtivo,
     transacoes,
   )
 
@@ -80,16 +80,26 @@ export function Dashboard({ userId }: { userId: string }) {
 
   const cartoesComSaldo = useMemo<CartaoComSaldo[]>(() => {
     return cartoes.map(cartao => {
+      if (cartao.tipo !== 'credito') {
+        return {
+          ...cartao,
+          totalUsado: 0,
+          limiteDisponivel: cartao.saldoAtual,
+          percentualUsado: 0,
+          recargaEmBreve: recargaEmBreve(cartao.diaRecarga),
+        }
+      }
+
       const totalDeTx = transacoes
         .filter(t => t.cartaoId === cartao.id && t.tipo === 'gasto')
         .reduce((sum, t) => sum + t.valor, 0)
       const totalDeContas = contas
-        .filter(c => c.cartaoId === cartao.id && c.pago)
+        .filter(c => c.cartaoId === cartao.id && (c.pago || !!c.parcelas))
         .reduce((sum, c) => sum + c.valor, 0)
       const totalUsado = totalDeTx + totalDeContas
       const limiteDisponivel = cartao.limite - totalUsado
       const percentualUsado = cartao.limite > 0 ? (totalUsado / cartao.limite) * 100 : 0
-      return { ...cartao, totalUsado, limiteDisponivel, percentualUsado }
+      return { ...cartao, totalUsado, limiteDisponivel, percentualUsado, recargaEmBreve: false }
     })
   }, [cartoes, transacoes, contas])
 
@@ -108,12 +118,23 @@ export function Dashboard({ userId }: { userId: string }) {
       }
       autoFaturaRef.current.add(key)
       const txPath = `users/${userId}/months/${prevId}/transactions`
-      const snap = await getDocs(query(
-        collection(db, txPath),
-        where('cartaoId', '==', cartao.id),
-        where('tipo', '==', 'gasto'),
-      ))
-      const total = snap.docs.reduce((sum, d) => sum + ((d.data().valor as number) ?? 0), 0)
+      const billsPath = `users/${userId}/months/${prevId}/bills`
+      const [txSnap, billsSnap] = await Promise.all([
+        getDocs(query(
+          collection(db, txPath),
+          where('cartaoId', '==', cartao.id),
+          where('tipo', '==', 'gasto'),
+        )),
+        getDocs(query(
+          collection(db, billsPath),
+          where('cartaoId', '==', cartao.id),
+        )),
+      ])
+      const totalTx = txSnap.docs.reduce((sum, d) => sum + ((d.data().valor as number) ?? 0), 0)
+      const totalBills = billsSnap.docs
+        .filter(d => !!d.data().parcelas)
+        .reduce((sum, d) => sum + ((d.data().valor as number) ?? 0), 0)
+      const total = totalTx + totalBills
       if (total > 0) {
         await criarFatura(cartao.id, prevId, mesAtivo, total)
       }
@@ -208,7 +229,7 @@ export function Dashboard({ userId }: { userId: string }) {
 
       <main
         id="tab-content"
-        className="max-w-2xl mx-auto px-5 py-5 pb-40 flex flex-col gap-4"
+        className="w-full max-w-[480px] mx-auto px-4 py-5 pb-40 flex flex-col gap-4"
       >
         <AnimatePresence mode="wait">
           <motion.div
@@ -229,10 +250,12 @@ export function Dashboard({ userId }: { userId: string }) {
                 totalSaldo={totalSaldo}
                 totalGastos={totalGastos}
                 totalPendente={totalPendente}
+                nRecebiveis={recebiveis.length}
                 gastosPorCategoria={gastosPorCategoria}
                 gastosPorDia={gastosPorDia}
                 onEditReceita={() => setReceitaModalOpen(true)}
                 onNavigateToBancos={() => setAbaAtiva('bancos')}
+                onNavigateToCartoes={() => setAbaAtiva('cartoes')}
               />
             )}
             {abaAtiva === 'contas' && (
@@ -263,6 +286,7 @@ export function Dashboard({ userId }: { userId: string }) {
                 onAdd={addTransacao}
                 onUpdate={updateTransacao}
                 onDelete={deleteTransacao}
+                onUpdateCartao={updateCartao}
               />
             )}
             {abaAtiva === 'bancos' && (
@@ -288,6 +312,7 @@ export function Dashboard({ userId }: { userId: string }) {
             {abaAtiva === 'cartoes' && (
               <CartoesTab
                 cartoes={cartoesComSaldo}
+                contas={contas}
                 faturas={faturas}
                 bancos={bancos}
                 onAdd={addCartao}

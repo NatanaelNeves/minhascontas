@@ -2,8 +2,6 @@ import { motion } from 'framer-motion'
 import { CartaoComSaldo } from '@/types'
 import { formatBRL } from '@/lib/utils'
 
-const BENEFIT_TIPOS = ['vale_alimentacao', 'vale_refeicao', 'vale_combustivel'] as const
-
 interface Props {
   totalSaldo: number
   cartoesComSaldo: CartaoComSaldo[]
@@ -17,11 +15,15 @@ export function SaldoPatrimonial({
   onNavigateToBancos,
   semBancos,
 }: Props) {
-  const saldoBeneficios = cartoesComSaldo
-    .filter(c => (BENEFIT_TIPOS as ReadonlyArray<string>).includes(c.tipo))
+  const saldoAlimentacaoRefeicao = cartoesComSaldo
+    .filter(c => c.tipo === 'vale_alimentacao' || c.tipo === 'vale_refeicao')
     .reduce((s, c) => s + c.limiteDisponivel, 0)
 
-  const totalDisponivel = totalSaldo + saldoBeneficios
+  const saldoCombustivel = cartoesComSaldo
+    .filter(c => c.tipo === 'vale_combustivel')
+    .reduce((s, c) => s + c.limiteDisponivel, 0)
+
+  const totalDisponivel = totalSaldo + saldoAlimentacaoRefeicao + saldoCombustivel
 
   return (
     <motion.div
@@ -30,27 +32,41 @@ export function SaldoPatrimonial({
       transition={{ duration: 0.3 }}
       style={{
         background: 'var(--bg-surface)',
-        border: '0.5px solid var(--border)',
+        border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
         overflow: 'hidden',
       }}
     >
-      {/* Header label */}
-      <div style={{ padding: '16px 20px 0' }}>
+      {/* Header: label + THE number */}
+      <div style={{ padding: '20px 20px 16px' }}>
         <p style={{
-          fontSize: 9, fontWeight: 700, color: 'var(--text-tertiary)',
-          letterSpacing: '0.12em', textTransform: 'uppercase',
+          fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)',
+          letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6,
         }}>
           Disponível agora
         </p>
+        <motion.span
+          key={totalDisponivel}
+          initial={{ scale: 0.96, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.25 }}
+          style={{
+            display: 'block',
+            fontSize: 32, fontWeight: 600,
+            color: semBancos ? 'var(--text-tertiary)' : totalDisponivel >= 0 ? 'var(--green)' : 'var(--red)',
+            letterSpacing: '-0.05em', fontVariantNumeric: 'tabular-nums',
+            lineHeight: 1.1,
+          }}
+        >
+          {semBancos ? '—' : formatBRL(totalDisponivel)}
+        </motion.span>
       </div>
 
-      {/* Sub-itens */}
-      <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {/* Bancos */}
+      {/* Breakdown lines */}
+      <div style={{ borderTop: '0.5px solid var(--divider)', padding: '12px 20px 16px', display: 'flex', flexDirection: 'column', gap: 7 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 12, color: 'var(--text-secondary)', letterSpacing: '-0.01em' }}>
-            Em bancos
+            🏦 Em bancos
           </span>
           {semBancos ? (
             <button
@@ -59,60 +75,48 @@ export function SaldoPatrimonial({
                 fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)',
                 background: 'none', border: 'none', cursor: 'pointer', padding: 0,
                 textDecoration: 'underline', textUnderlineOffset: 2, letterSpacing: '-0.01em',
+                fontFamily: 'inherit',
               }}
             >
-              Adicionar banco
+              Cadastrar bancos
             </button>
           ) : (
             <span style={{
-              fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
-              letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
+              fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)',
+              letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums',
             }}>
               {formatBRL(totalSaldo)}
             </span>
           )}
         </div>
 
-        {/* Benefícios (só mostra se há cartões benefício) */}
-        {saldoBeneficios > 0 && (
+        {saldoAlimentacaoRefeicao > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, color: 'var(--text-secondary)', letterSpacing: '-0.01em' }}>
-              Em benefícios
+              🍽️ Alimentação/Refeição
             </span>
             <span style={{
-              fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
-              letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
+              fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)',
+              letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums',
             }}>
-              {formatBRL(saldoBeneficios)}
+              {formatBRL(saldoAlimentacaoRefeicao)}
             </span>
           </div>
         )}
-      </div>
 
-      {/* Separator */}
-      <div style={{ height: '0.5px', background: 'var(--divider)', margin: '0 20px' }} />
-
-      {/* Total */}
-      <div style={{ padding: '14px 20px 18px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{
-          fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)',
-          letterSpacing: '0.09em', textTransform: 'uppercase',
-        }}>
-          Total disponível
-        </span>
-        <motion.span
-          key={totalDisponivel}
-          initial={{ scale: 0.96, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.25 }}
-          style={{
-            fontSize: 28, fontWeight: 700,
-            color: totalDisponivel >= 0 ? 'var(--green)' : 'var(--red)',
-            letterSpacing: '-0.05em', fontVariantNumeric: 'tabular-nums',
-          }}
-        >
-          {semBancos ? '—' : formatBRL(totalDisponivel)}
-        </motion.span>
+        {saldoCombustivel > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', letterSpacing: '-0.01em' }}>
+              ⛽ Combustível
+            </span>
+            <span style={{
+              fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)',
+              letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums',
+            }}>
+              {formatBRL(saldoCombustivel)}
+            </span>
+          </div>
+        )}
       </div>
     </motion.div>
   )

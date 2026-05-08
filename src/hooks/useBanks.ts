@@ -7,6 +7,9 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
+  getDoc,
+  getDocs,
+  setDoc,
   QueryDocumentSnapshot,
   DocumentData,
 } from 'firebase/firestore'
@@ -35,27 +38,56 @@ export interface UseBanksReturn {
 
 export function useBanks(
   userId: string,
-  mesId: string,
   transacoes: Transacao[],
 ): UseBanksReturn {
   const [bancosRaw, setBancosRaw] = useState<Banco[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  const path = `users/${userId}/months/${mesId}/banks`
+  const path = `users/${userId}/banks`
 
   useEffect(() => {
-    if (!userId || !mesId) return
+    if (!userId) return
     setIsLoading(true)
     const unsub = onSnapshot(collection(db, path), (snap) => {
       setBancosRaw(snap.docs.map(docToBanco))
       setIsLoading(false)
     })
     return unsub
-  }, [userId, mesId])
+  }, [userId])
+
+  // One-time migration: move per-month banks to global
+  useEffect(() => {
+    if (!userId) return
+    const userRef = doc(db, `users/${userId}`)
+    getDoc(userRef).then(async (snap) => {
+      if (snap.exists() && snap.data()?.bancosMigrado) return
+      const monthsSnap = await getDocs(collection(db, `users/${userId}/months`))
+      const bancosByName = new Map<string, Omit<Banco, 'id' | 'criadoEm'>>()
+      for (const monthDoc of monthsSnap.docs) {
+        const banksSnap = await getDocs(
+          collection(db, `users/${userId}/months/${monthDoc.id}/banks`)
+        )
+        for (const bankDoc of banksSnap.docs) {
+          const d = bankDoc.data()
+          if (!bancosByName.has(d.nome)) {
+            bancosByName.set(d.nome, { nome: d.nome, saldoInicial: d.saldoInicial, cor: d.cor })
+          }
+        }
+      }
+      const existingSnap = await getDocs(collection(db, path))
+      if (existingSnap.empty && bancosByName.size > 0) {
+        for (const [, banco] of bancosByName) {
+          await addDoc(collection(db, path), { ...banco, criadoEm: serverTimestamp() })
+        }
+      }
+      await setDoc(userRef, { bancosMigrado: true }, { merge: true })
+    })
+  }, [userId])
 
   const porBanco = useMemo(() => {
     const map: Record<string, Transacao[]> = {}
     transacoes.forEach(t => {
+      if (!t.bancoId) return
       if (!map[t.bancoId]) map[t.bancoId] = []
       map[t.bancoId].push(t)
     })

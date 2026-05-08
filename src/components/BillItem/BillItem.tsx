@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pencil, Trash2 } from 'lucide-react'
 import { Conta } from '@/types'
-import { formatBRL, getAlertaVencimento, getBillEmoji, getBillAvatarBg } from '@/lib/utils'
+import { formatBRL, getAlertaVencimento, getBillEmoji, getBillAvatarBg, mesIdAddMeses, mesIdToShortLabel } from '@/lib/utils'
+import { useAppStore } from '@/store/useAppStore'
 import { ConfirmDeleteParcelaModal } from '@/components/Modals/ConfirmDeleteParcelaModal'
 
 interface Props {
@@ -23,9 +24,20 @@ const FORMA_LABEL: Record<string, string> = {
 export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcelamento }: Props) {
   const [confirmando, setConfirmando] = useState(false)
   const [confirmParcelaOpen, setConfirmParcelaOpen] = useState(false)
+  const { mesAtivo } = useAppStore()
   const alerta = getAlertaVencimento(conta.vencimento, conta.pago)
   const emoji = getBillEmoji(conta.nome)
   const avatarBg = getBillAvatarBg(conta.nome)
+
+  const parcelasInfo = conta.parcelas ? (() => {
+    const mr = conta.parcelas.total - conta.parcelas.atual
+    const cor = mr > 6 ? 'var(--green)' : mr >= 3 ? 'var(--amber)' : 'var(--red)'
+    const corMuted = mr > 6 ? 'var(--green-muted)' : mr >= 3 ? 'var(--amber-muted)' : 'var(--red-muted)'
+    const corBorder = mr > 6 ? 'rgba(52,199,123,0.22)' : mr >= 3 ? 'rgba(245,158,11,0.22)' : 'rgba(239,68,68,0.22)'
+    const mesTermina = mesIdAddMeses(mesAtivo, mr)
+    const totalRestante = conta.valor * (mr + 1)
+    return { mr, cor, corMuted, corBorder, mesTermina, totalRestante }
+  })() : null
 
   return (
     <motion.div
@@ -122,17 +134,17 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcel
         </span>
 
         <div className="flex items-center gap-1 flex-wrap justify-end">
-          {conta.parcelas && (
+          {parcelasInfo && (
             <span
               className="text-[10px] font-medium px-1.5 py-[2px] rounded-full"
               style={{
-                background: 'var(--purple-muted)',
-                color: 'var(--purple)',
-                border: '0.5px solid rgba(124,114,216,0.22)',
+                background: parcelasInfo.corMuted,
+                color: parcelasInfo.cor,
+                border: `0.5px solid ${parcelasInfo.corBorder}`,
                 letterSpacing: '0.01em',
               }}
             >
-              {conta.parcelas.atual}/{conta.parcelas.total}
+              {conta.parcelas!.atual}/{conta.parcelas!.total}
             </span>
           )}
 
@@ -162,6 +174,12 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcel
             </span>
           )}
         </div>
+
+        {parcelasInfo && (
+          <p style={{ fontSize: 9, color: parcelasInfo.cor, letterSpacing: '-0.01em', textAlign: 'right' }}>
+            {mesIdToShortLabel(parcelasInfo.mesTermina)} · {formatBRL(parcelasInfo.totalRestante)}
+          </p>
+        )}
       </div>
 
       {/* Hover actions */}

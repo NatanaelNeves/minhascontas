@@ -89,7 +89,8 @@ export function useMonth(userId: string): UseMonthReturn {
 
     for (const docSnap of snap.docs) {
       const data = docSnap.data()
-      if (data.categoria !== 'fixo') continue
+      const devecopiar = data.recorrente === true || data.categoria === 'fixo'
+      if (!devecopiar) continue
       if (data.parcelamentoId) continue   // already pre-created, skip
       if (data.parcelas && data.parcelas.atual >= data.parcelas.total) continue
 
@@ -105,6 +106,7 @@ export function useMonth(userId: string): UseMonthReturn {
         vencimento: data.vencimento ?? null,
         parcelas: novaParcelas,
         pago: false,
+        ...(data.recorrente ? { recorrente: true } : {}),
         criadoEm: serverTimestamp(),
       })
     }

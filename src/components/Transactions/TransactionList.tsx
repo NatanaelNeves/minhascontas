@@ -1,11 +1,12 @@
 import { useMemo } from 'react'
-import { Transacao, BancoComSaldo } from '@/types'
+import { Transacao, BancoComSaldo, Cartao } from '@/types'
 import { TransactionItem } from './TransactionItem'
 import { formatBRL } from '@/lib/utils'
 
 interface Props {
   transacoes: Transacao[]
   bancos: BancoComSaldo[]
+  cartoes?: Cartao[]
   onEdit: (t: Transacao) => void
   onDelete: (id: string) => void
 }
@@ -19,7 +20,7 @@ function formatGroupDate(dateStr: string): string {
   return `${d}/${m}`
 }
 
-export function TransactionList({ transacoes, bancos, onEdit, onDelete }: Props) {
+export function TransactionList({ transacoes, bancos, cartoes = [], onEdit, onDelete }: Props) {
   const grupos = useMemo(() => {
     const map = new Map<string, Transacao[]>()
     transacoes.forEach(t => {
@@ -79,6 +80,7 @@ export function TransactionList({ transacoes, bancos, onEdit, onDelete }: Props)
                   <TransactionItem
                     transacao={t}
                     bancos={bancos}
+                    cartoes={cartoes}
                     onEdit={onEdit}
                     onDelete={onDelete}
                   />

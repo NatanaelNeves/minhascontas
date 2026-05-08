@@ -3,6 +3,7 @@ import { Search } from 'lucide-react'
 import { Transacao, TransacaoInput, BancoComSaldo, Cartao } from '@/types'
 import { TransactionList } from '@/components/Transactions/TransactionList'
 import { TransactionModal } from '@/components/Transactions/TransactionModal'
+import { isCartaoCredito } from '@/lib/cartoes'
 
 interface Props {
   transacoes: Transacao[]
@@ -11,12 +12,15 @@ interface Props {
   onAdd: (data: TransacaoInput) => Promise<void>
   onUpdate: (id: string, data: Partial<TransacaoInput>) => Promise<void>
   onDelete: (id: string) => Promise<void>
+  onUpdateCartao: (id: string, data: Partial<Cartao>) => Promise<void>
 }
 
-export function GastosTab({ transacoes, bancos, cartoes, onAdd, onUpdate, onDelete }: Props) {
+export function GastosTab({ transacoes, bancos, cartoes, onAdd, onUpdate, onDelete, onUpdateCartao }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editando, setEditando] = useState<Transacao | null>(null)
   const [busca, setBusca] = useState('')
+
+  const transacoesPorId = useMemo(() => new Map(transacoes.map(t => [t.id, t])), [transacoes])
 
   useEffect(() => {
     function openAdd() { setEditando(null); setModalOpen(true) }
@@ -24,10 +28,48 @@ export function GastosTab({ transacoes, bancos, cartoes, onAdd, onUpdate, onDele
     return () => document.removeEventListener('fab-gastos', openAdd)
   }, [])
 
-  function handleSave(data: TransacaoInput) {
-    if (editando) onUpdate(editando.id, data)
-    else onAdd(data)
+  function getCartaoBeneficio(cartaoId?: string) {
+    if (!cartaoId) return null
+    const cartao = cartoes.find(c => c.id === cartaoId)
+    if (!cartao || isCartaoCredito(cartao)) return null
+    return cartao
+  }
+
+  async function ajustarSaldoCartao(cartaoId: string, delta: number) {
+    const cartao = getCartaoBeneficio(cartaoId)
+    if (!cartao) return
+    await onUpdateCartao(cartaoId, { saldoAtual: Math.max(0, cartao.saldoAtual + delta) })
+  }
+
+  async function handleSave(data: TransacaoInput) {
+    const anterior = editando ? transacoesPorId.get(editando.id) ?? editando : null
+    const cartaoAnterior = anterior ? getCartaoBeneficio(anterior.cartaoId) : null
+    const cartaoNovo = getCartaoBeneficio(data.cartaoId)
+
+    if (anterior?.tipo === 'gasto' && cartaoAnterior) {
+      await ajustarSaldoCartao(cartaoAnterior.id, anterior.valor)
+    }
+
+    if (data.tipo === 'gasto' && cartaoNovo) {
+      await ajustarSaldoCartao(cartaoNovo.id, -data.valor)
+    }
+
+    if (editando) {
+      await onUpdate(editando.id, data)
+    } else {
+      await onAdd(data)
+    }
+
     setEditando(null)
+  }
+
+  async function handleDelete(id: string) {
+    const transacao = transacoesPorId.get(id)
+    const cartao = transacao ? getCartaoBeneficio(transacao.cartaoId) : null
+    if (transacao?.tipo === 'gasto' && cartao) {
+      await ajustarSaldoCartao(cartao.id, transacao.valor)
+    }
+    await onDelete(id)
   }
 
   const filtradas = useMemo(() => {
@@ -38,7 +80,6 @@ export function GastosTab({ transacoes, bancos, cartoes, onAdd, onUpdate, onDele
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Search bar */}
       <div style={{ position: 'relative' }}>
         <Search
           size={13}
@@ -72,11 +113,12 @@ export function GastosTab({ transacoes, bancos, cartoes, onAdd, onUpdate, onDele
       <TransactionList
         transacoes={filtradas}
         bancos={bancos}
+        cartoes={cartoes}
         onEdit={t => {
           setEditando(t)
           setModalOpen(true)
         }}
-        onDelete={onDelete}
+        onDelete={handleDelete}
       />
       <TransactionModal
         open={modalOpen}

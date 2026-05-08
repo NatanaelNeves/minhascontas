@@ -121,7 +121,7 @@ export function BankModal({ open, editando, onSave, onClose }: Props) {
               width: 'min(420px, 100vw)',
               background: 'var(--bg-elevated)',
               borderLeft: '0.5px solid var(--border)',
-              display: 'flex', flexDirection: 'column',
+              display: 'grid', gridTemplateRows: 'auto 1fr auto', overflow: 'hidden',
             }}
           >
             {/* Header */}
@@ -145,7 +145,7 @@ export function BankModal({ open, editando, onSave, onClose }: Props) {
             </div>
 
             {/* Body */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '22px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div className="no-scrollbar" style={{ overflowY: 'auto', minHeight: 0, padding: '22px', display: 'flex', flexDirection: 'column', gap: 20, scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}>
 
               {/* Nome */}
               <div>

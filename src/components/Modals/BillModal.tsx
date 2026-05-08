@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { Conta, ContaInput, Categoria, FormaPagamento, Cartao } from '@/types'
+import { Conta, ContaInput, Categoria, FormaPagamento, Cartao, CartaoCredito } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { formatMesLabel, centavosToDisplay, valorToCentStr, formatBRL } from '@/lib/utils'
+import { formatMesLabel, centavosToDisplay, valorToCentStr, formatBRL, mesIdAddMeses, mesesEntreMesIds, mesIdToShortLabel } from '@/lib/utils'
 
 interface Props {
   open: boolean
@@ -108,6 +108,16 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
   const [valorTotalCentStr, setValorTotalCentStr] = useState('')
   const [parcelasTotal, setParcelasTotal] = useState(2)
   const [parcelaAtual, setParcelaAtual] = useState(1)
+  const [mesInicio, setMesInicio] = useState('')
+  const [recorrente, setRecorrente] = useState(false)
+
+  const mesOptions = useMemo(() => {
+    const opts: string[] = []
+    for (let i = 60; i >= 0; i--) opts.push(mesIdAddMeses(mesAtivo, -i))
+    return opts
+  }, [mesAtivo])
+
+  const creditCards = cartoes.filter((c): c is CartaoCredito => c.tipo === 'credito')
 
   useEffect(() => {
     if (editando) {
@@ -122,6 +132,7 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
       })
       setCartaoId(editando.cartaoId ?? '')
       setCentStr(valorToCentStr(editando.valor))
+      setRecorrente(editando.recorrente ?? false)
       const hasParcelas = !!editando.parcelas
       setTemParcelas(hasParcelas)
       if (hasParcelas && editando.parcelas) {
@@ -141,8 +152,44 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
       setParcelasTotal(2)
       setParcelaAtual(1)
       setValorTotalCentStr('')
+      setMesInicio('')
+      setRecorrente(false)
     }
   }, [editando, open])
+
+  useEffect(() => {
+    if (!mesInicio || !mesAtivo) return
+    const diff = mesesEntreMesIds(mesInicio, mesAtivo)
+    setParcelaAtual(Math.max(1, diff + 1))
+  }, [mesInicio, mesAtivo])
+
+  useEffect(() => {
+    // If category is cartao, payment is always credit when a card is chosen
+    if (form.categoria === 'cartao' && cartaoId) {
+      setForm(f => ({ ...f, formaPagamento: 'credito' }))
+      return
+    }
+
+    // If parcelado with no card selected, avoid leaving forma as credito
+    if (temParcelas && !cartaoId) {
+      setForm(f => f.formaPagamento === 'credito' ? { ...f, formaPagamento: 'pix' } : f)
+    }
+  }, [temParcelas, cartaoId, form.categoria])
+
+  // Auto-fill vencimento for new card purchases (não em edição)
+  useEffect(() => {
+    if (!mesAtivo) return
+    if (editando) return
+    if (form.categoria !== 'cartao') return
+    if (!cartaoId) return
+    if (temParcelas) return
+    const c = creditCards.find(c => c.id === cartaoId)
+    if (!c) return
+    const dia = c.diaVencimento as number | undefined
+    if (!dia) return
+    const dayStr = String(Math.max(1, Math.min(28, dia))).padStart(2, '0')
+    setForm(f => ({ ...f, vencimento: `${mesAtivo}-${dayStr}` }))
+  }, [cartaoId, form.categoria, temParcelas, mesAtivo, cartoes, editando])
 
   useEffect(() => {
     if (!open) return
@@ -175,6 +222,11 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
     ? Math.abs(valorTotalReais - valorParcelaReais * parcelasTotal) > valorTotalReais * 0.01
     : false
 
+  const mostrarForma = form.categoria !== 'cartao' && !(temParcelas && !!cartaoId)
+  const formasFiltradas = (temParcelas && !cartaoId)
+    ? FORMAS.filter(f => f.value !== 'credito')
+    : FORMAS
+
   function handleSave() {
     if (!form.nome.trim() || getCents() <= 0) return
     const data: ContaInput = {
@@ -182,6 +234,7 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
       valor: getCents() / 100,
       parcelas: temParcelas ? { atual: parcelaAtual, total: parcelasTotal } : null,
       ...(cartaoId ? { cartaoId } : {}),
+      recorrente,
     }
     if (temParcelas && parcelasTotal > 1 && !editando && onSaveParcelada) {
       onSaveParcelada(data, parcelasTotal, parcelaAtual)
@@ -195,7 +248,8 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
   const canSave = (() => {
     if (!form.nome.trim()) return false
     if (getCents() <= 0) return false
-    if (form.categoria === 'cartao' && cartoes.length > 0 && !cartaoId) return false
+    if (form.categoria === 'cartao' && !cartaoId) return false
+    if (form.categoria === 'extra' && form.formaPagamento === 'credito' && !cartaoId) return false
     return true
   })()
 
@@ -238,11 +292,11 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
               width: 'min(420px, 100vw)',
               background: 'var(--bg-elevated)',
               borderLeft: '0.5px solid var(--border)',
-              display: 'flex', flexDirection: 'column',
+              display: 'flex', flexDirection: 'column', overflowY: 'auto', overscrollBehavior: 'contain',
             }}
           >
             {/* Header */}
-            <div style={{ padding: '18px 22px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div style={{ padding: '18px 22px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-elevated)' }}>
               <div>
                 <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 3 }}>
                   {formatMesLabel(mesAtivo)}
@@ -267,45 +321,20 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
             </div>
 
             {/* Body */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '22px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div className="no-scrollbar" style={{ padding: '22px', display: 'flex', flexDirection: 'column', gap: 20, scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}>
               {/* Nome */}
               <div>
                 <Label>Nome</Label>
                 <input
                   value={form.nome}
                   onChange={e => setForm(f => ({ ...f, nome: e.target.value }))}
-                  placeholder="ex: Netflix, Aluguel, Fatura..."
+                  placeholder={form.categoria === 'fixo' ? 'ex: Internet, Faculdade, Empréstimo Caixa...' : 'ex: Netflix, Aluguel, Fatura...'}
                   autoFocus
                   style={baseInput}
                   onFocus={focusInput}
                   onBlur={blurInput}
                 />
               </div>
-
-              {/* Valor — só quando !temParcelas */}
-              {!temParcelas && (
-                <div>
-                  <Label>Valor</Label>
-                  <div style={{ position: 'relative' }}>
-                    <span style={{
-                      position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
-                      fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)',
-                      pointerEvents: 'none', letterSpacing: '-0.02em', userSelect: 'none',
-                    }}>
-                      R$
-                    </span>
-                    <input
-                      value={centavosToDisplay(centStr)}
-                      onChange={e => setCentStr(e.target.value.replace(/\D/g, ''))}
-                      placeholder="0,00"
-                      inputMode="numeric"
-                      style={{ ...baseInput, paddingLeft: 46, fontSize: 30, fontWeight: 700, letterSpacing: '-0.05em', height: 62 }}
-                      onFocus={focusInput}
-                      onBlur={blurInput}
-                    />
-                  </div>
-                </div>
-              )}
 
               {/* Categoria */}
               <div>
@@ -332,139 +361,154 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
                     </button>
                   ))}
                 </div>
+                {/* Descriptive hint under category selector */}
+                {!form.nome.trim() && (
+                  <p style={{ marginTop: 8, fontSize: 11, color: 'var(--text-tertiary)' }}>
+                    {form.categoria === 'fixo' ? '💡 Conta recorrente mensal — internet, faculdade, seguro' :
+                      form.categoria === 'cartao' ? '💳 Compra no cartão — à vista ou parcelada' : '🎯 Gasto pontual — presente, viagem, consulta'}
+                  </p>
+                )}
               </div>
 
-              {/* Cartão picker — só quando categoria === 'cartao' */}
+              {/* Cartão picker — aparece para categoria 'cartao' (obrigatório) ou quando forma de pagamento é crédito em 'extra' */}
               <AnimatePresence>
-                {form.categoria === 'cartao' && (
+                {(form.categoria === 'cartao' || (form.categoria === 'extra' && form.formaPagamento === 'credito')) && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
                     style={{ overflow: 'hidden' }}
                   >
-                    <div>
-                      <Label>Qual cartão?</Label>
-                      {cartoes.length === 0 ? (
-                        <div style={{
-                          padding: '14px', borderRadius: 10,
-                          background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-                        }}>
-                          <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
-                            Nenhum cartão cadastrado.
-                          </p>
-                          {onNavigateToCartoes && (
-                            <button
-                              type="button"
-                              onClick={() => { onClose(); onNavigateToCartoes() }}
-                              style={{
-                                padding: '6px 14px', borderRadius: 99, fontSize: 12, fontWeight: 600,
-                                background: 'var(--text-primary)', color: 'var(--bg-base)',
-                                border: 'none', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
-                              }}
-                            >
-                              Ir para Cartões
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {cartoes.map(c => (
-                            <button
-                              key={c.id}
-                              type="button"
-                              onClick={() => setCartaoId(c.id)}
-                              style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                padding: '11px 14px', borderRadius: 10,
-                                background: cartaoId === c.id ? 'var(--text-primary)' : 'var(--bg-surface)',
-                                border: cartaoId === c.id ? '1px solid var(--text-primary)' : '1px solid var(--border)',
-                                cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.cor, flexShrink: 0 }} />
-                                <span style={{ fontSize: 14, fontWeight: 500, color: cartaoId === c.id ? 'var(--bg-base)' : 'var(--text-primary)' }}>
-                                  {c.nome}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div>
+                        <Label>Qual cartão?</Label>
+                        {creditCards.length === 0 ? (
+                          <div style={{
+                            padding: '14px', borderRadius: 10,
+                            background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                          }}>
+                            <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                              Nenhum cartão de crédito cadastrado.
+                            </p>
+                            {onNavigateToCartoes && (
+                              <button
+                                type="button"
+                                onClick={() => { onClose(); onNavigateToCartoes() }}
+                                style={{
+                                  padding: '6px 14px', borderRadius: 99, fontSize: 12, fontWeight: 600,
+                                  background: 'var(--text-primary)', color: 'var(--bg-base)',
+                                  border: 'none', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+                                }}
+                              >
+                                Ir para Cartões
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {creditCards.map(c => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => setCartaoId(c.id)}
+                                style={{
+                                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                  padding: '11px 14px', borderRadius: 10,
+                                  background: cartaoId === c.id ? 'var(--text-primary)' : 'var(--bg-surface)',
+                                  border: cartaoId === c.id ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                                  cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.cor, flexShrink: 0 }} />
+                                  <span style={{ fontSize: 14, fontWeight: 500, color: cartaoId === c.id ? 'var(--bg-base)' : 'var(--text-primary)' }}>
+                                    {c.nome}
+                                  </span>
+                                </div>
+                                <span style={{
+                                  fontSize: 10, fontWeight: 500, padding: '2px 8px', borderRadius: 99,
+                                  background: cartaoId === c.id ? 'rgba(0,0,0,0.15)' : 'var(--bg-elevated)',
+                                  color: cartaoId === c.id ? 'var(--bg-base)' : 'var(--text-tertiary)',
+                                  letterSpacing: '0.02em',
+                                }}>
+                                  {TIPO_LABEL[c.tipo] ?? c.tipo}
                                 </span>
-                              </div>
-                              <span style={{
-                                fontSize: 10, fontWeight: 500, padding: '2px 8px', borderRadius: 99,
-                                background: cartaoId === c.id ? 'rgba(0,0,0,0.15)' : 'var(--bg-elevated)',
-                                color: cartaoId === c.id ? 'var(--bg-base)' : 'var(--text-tertiary)',
-                                letterSpacing: '0.02em',
-                              }}>
-                                {TIPO_LABEL[c.tipo] ?? c.tipo}
-                              </span>
-                            </button>
-                          ))}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Inline error */}
+                      {creditCards.length > 0 && !cartaoId && (
+                        <p style={{ fontSize: 12, color: 'var(--red)', letterSpacing: '-0.01em' }}>
+                          Selecione o cartão para continuar
+                        </p>
+                      )}
+
+                      {/* Info: parcela debitada do limite */}
+                      {temParcelas && !!cartaoId && valorParcelaReais > 0 && (
+                        <div style={{
+                          padding: '10px 14px', borderRadius: 10,
+                          background: 'rgba(52,199,123,0.08)', border: '1px solid rgba(52,199,123,0.2)',
+                        }}>
+                          <p style={{ fontSize: 12, color: 'var(--green)', lineHeight: 1.4 }}>
+                            💳 Será debitado {formatBRL(valorParcelaReais)} do limite mensalmente
+                          </p>
                         </div>
+                      )}
+
+                      {/* Info: inclusão na fatura — compra à vista no cartão */}
+                      {!temParcelas && !!cartaoId && (
+                        (() => {
+                          const c = creditCards.find(x => x.id === cartaoId)
+                          const dia = c?.diaFechamento as number | undefined
+                          const hoje = new Date().getDate()
+                          const mesRef = dia && hoje > dia ? mesIdAddMeses(mesAtivo, 1) : mesAtivo
+                          return (
+                            <div style={{
+                              padding: '10px 14px', borderRadius: 10,
+                              background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                            }}>
+                              <p style={{ fontSize: 12, color: 'var(--text-tertiary)', lineHeight: 1.4 }}>
+                                💳 Será incluído na fatura de {mesIdToShortLabel(mesRef)}
+                              </p>
+                            </div>
+                          )
+                        })()
                       )}
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              {/* Forma de pagamento */}
-              <div>
-                <Label>Forma de pagamento</Label>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {FORMAS.map(opt => {
-                    const selected = form.formaPagamento === opt.value
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setForm(f => ({ ...f, formaPagamento: opt.value }))}
-                        style={{
-                          padding: '7px 14px', borderRadius: 99, fontSize: 13, fontWeight: 500,
-                          cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
-                          display: 'flex', alignItems: 'center', gap: 5,
-                          border: selected ? '1px solid var(--text-primary)' : '1px solid var(--border)',
-                          background: selected ? 'var(--text-primary)' : 'var(--bg-surface)',
-                          color: selected ? 'var(--bg-base)' : 'var(--text-secondary)',
-                          letterSpacing: '-0.01em',
-                        }}
-                      >
-                        <span style={{ fontSize: 13 }}>{opt.icon}</span>
-                        {opt.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Vencimento */}
-              <div>
-                <Label>Vencimento (opcional)</Label>
-                <input
-                  type="date"
-                  value={form.vencimento ?? ''}
-                  onChange={e => setForm(f => ({ ...f, vencimento: e.target.value || null }))}
-                  style={{ ...baseInput, color: form.vencimento ? 'var(--text-primary)' : 'var(--text-tertiary)', colorScheme: 'dark' }}
-                  onFocus={focusInput}
-                  onBlur={blurInput}
-                />
-              </div>
-
-              {/* Parcelado — toggle */}
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '12px 14px', background: 'var(--bg-surface)',
-                border: '1px solid var(--border)', borderRadius: 10,
-              }}>
+              {/* Valor — só quando !temParcelas */}
+              {!temParcelas && (
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-                    Parcelado
-                  </p>
-                  <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                    Dividido em várias parcelas
-                  </p>
+                  <Label>Valor</Label>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{
+                      position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+                      fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)',
+                      pointerEvents: 'none', letterSpacing: '-0.02em', userSelect: 'none',
+                    }}>
+                      R$
+                    </span>
+                    <input
+                      value={centavosToDisplay(centStr)}
+                      onChange={e => setCentStr(e.target.value.replace(/\D/g, ''))}
+                      placeholder="0,00"
+                      inputMode="numeric"
+                      style={{ ...baseInput, paddingLeft: 46, fontSize: 30, fontWeight: 700, letterSpacing: '-0.05em', height: 62 }}
+                      onFocus={focusInput}
+                      onBlur={blurInput}
+                    />
+                  </div>
                 </div>
-                <Toggle on={temParcelas} onToggle={() => setTemParcelas(v => !v)} />
-              </div>
+              )}
 
+              {/* Parcelamento fields — quando temParcelas */}
               <AnimatePresence>
                 {temParcelas && (
                   <motion.div
@@ -496,6 +540,23 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
                           />
                         </div>
                       </div>
+
+                      {/* Mês de início — só para novas contas */}
+                      {!editando && (
+                        <div>
+                          <Label>Começou em qual mês?</Label>
+                          <select
+                            value={mesInicio}
+                            onChange={e => setMesInicio(e.target.value)}
+                            style={{ ...baseInput, colorScheme: 'dark' }}
+                          >
+                            <option value="">Mês atual (parcela 1)</option>
+                            {mesOptions.slice(0, -1).reverse().map(m => (
+                              <option key={m} value={m}>{mesIdToShortLabel(m)}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
 
                       {/* Número de parcelas + parcela atual — lado a lado */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -561,6 +622,90 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
                 )}
               </AnimatePresence>
 
+              {/* Vencimento */}
+              {!(form.categoria === 'cartao' && temParcelas) && (
+                <div>
+                  <Label>Vencimento (opcional)</Label>
+                  <input
+                    type="date"
+                    value={form.vencimento ?? ''}
+                    onChange={e => setForm(f => ({ ...f, vencimento: e.target.value || null }))}
+                    style={{ ...baseInput, color: form.vencimento ? 'var(--text-primary)' : 'var(--text-tertiary)', colorScheme: 'dark' }}
+                    onFocus={focusInput}
+                    onBlur={blurInput}
+                  />
+                </div>
+              )}
+
+              {/* Forma de pagamento — oculta quando parcelado + cartão selecionado */}
+              {mostrarForma && (
+                <div>
+                  <Label>Forma de pagamento</Label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {formasFiltradas.map(opt => {
+                      const selected = form.formaPagamento === opt.value
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, formaPagamento: opt.value }))}
+                          style={{
+                            padding: '7px 14px', borderRadius: 99, fontSize: 13, fontWeight: 500,
+                            cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+                            display: 'flex', alignItems: 'center', gap: 5,
+                            border: selected ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                            background: selected ? 'var(--text-primary)' : 'var(--bg-surface)',
+                            color: selected ? 'var(--bg-base)' : 'var(--text-secondary)',
+                            letterSpacing: '-0.01em',
+                          }}
+                        >
+                          <span style={{ fontSize: 13 }}>{opt.icon}</span>
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Parcelado — toggle (apenas para categoria 'cartao') */}
+              {form.categoria === 'cartao' && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 14px', background: 'var(--bg-surface)',
+                  border: '1px solid var(--border)', borderRadius: 10,
+                }}>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                      Parcelado
+                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                      Dividido em várias parcelas
+                    </p>
+                  </div>
+                  <Toggle on={temParcelas} onToggle={() => setTemParcelas(v => !v)} />
+                </div>
+              )}
+
+              {/* Repete todo mês — toggle */}
+              {form.categoria === 'fixo' && !temParcelas && !editando?.parcelamentoId && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 14px', background: 'var(--bg-surface)',
+                  border: '1px solid var(--border)', borderRadius: 10,
+                }}>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                      Repete todo mês
+                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                      Copiado automaticamente ao criar novo mês
+                    </p>
+                  </div>
+                  <Toggle on={recorrente} onToggle={() => setRecorrente(v => !v)} />
+                </div>
+              )}
+
               {/* Pago — toggle */}
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -580,7 +725,7 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
             </div>
 
             {/* Footer */}
-            <div style={{ padding: '14px 22px', borderTop: '0.5px solid var(--border)', display: 'flex', gap: 8, flexShrink: 0 }}>
+            <div style={{ padding: '14px 22px', borderTop: '0.5px solid var(--border)', display: 'flex', gap: 8, flexShrink: 0, position: 'sticky', bottom: 0, zIndex: 2, background: 'var(--bg-elevated)' }}>
               <button
                 onClick={onClose}
                 style={{

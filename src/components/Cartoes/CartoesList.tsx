@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
-import { CartaoComSaldo, CartaoInput, FaturaCartao, BancoComSaldo, Cartao } from '@/types'
+import { CartaoComSaldo, CartaoInput, Conta, FaturaCartao, BancoComSaldo, Cartao } from '@/types'
 import { formatBRL } from '@/lib/utils'
+import { useAppStore } from '@/store/useAppStore'
 import { CartaoCard } from './CartaoCard'
 import { CartaoModal } from './CartaoModal'
+import { CartaoDetailSheet } from './CartaoDetailSheet'
 import { SelectBancoModal } from '@/components/Modals/SelectBancoModal'
 
 interface Props {
   cartoes: CartaoComSaldo[]
+  contas: Conta[]
   faturas: FaturaCartao[]
   bancos: BancoComSaldo[]
   onAdd: (data: CartaoInput) => void
@@ -18,6 +21,7 @@ interface Props {
 
 export function CartoesList({
   cartoes,
+  contas,
   faturas,
   bancos,
   onAdd,
@@ -26,9 +30,11 @@ export function CartoesList({
   onMarcarFaturaPaga,
   onNavigateToBancos,
 }: Props) {
+  const { mesAtivo } = useAppStore()
   const [modalOpen, setModalOpen] = useState(false)
   const [editando, setEditando] = useState<Cartao | null>(null)
   const [pagarFaturaId, setPagarFaturaId] = useState<string | null>(null)
+  const [detailCartao, setDetailCartao] = useState<CartaoComSaldo | null>(null)
 
   useEffect(() => {
     function openAdd() { setEditando(null); setModalOpen(true) }
@@ -48,7 +54,6 @@ export function CartoesList({
   }
 
   const totalLimiteDisponivel = cartoes
-    .filter(c => c.tipo === 'credito')
     .reduce((s, c) => s + c.limiteDisponivel, 0)
 
   return (
@@ -62,7 +67,7 @@ export function CartoesList({
           }}
         >
           <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase' }}>
-            Limite disponível
+            Disponível em cartões
           </span>
           <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
             {formatBRL(totalLimiteDisponivel)}
@@ -95,10 +100,12 @@ export function CartoesList({
           <CartaoCard
             key={c.id}
             cartao={c}
+            contasDoCartao={contas.filter(conta => conta.cartaoId === c.id)}
             fatura={faturas.find(f => f.cartaoId === c.id)}
             onEdit={setEditando}
             onDelete={onDelete}
             onPagarFatura={faturaId => setPagarFaturaId(faturaId)}
+            onDetail={() => setDetailCartao(c)}
           />
         ))}
       </div>
@@ -116,6 +123,14 @@ export function CartoesList({
         onSelect={handleBancoSelect}
         onClose={() => setPagarFaturaId(null)}
         onNavigateToBancos={onNavigateToBancos}
+      />
+
+      <CartaoDetailSheet
+        open={detailCartao !== null}
+        cartao={detailCartao}
+        contas={detailCartao ? contas.filter(c => c.cartaoId === detailCartao.id) : []}
+        mesAtivo={mesAtivo}
+        onClose={() => setDetailCartao(null)}
       />
     </div>
   )

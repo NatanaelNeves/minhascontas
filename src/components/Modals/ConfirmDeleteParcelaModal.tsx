@@ -38,6 +38,13 @@ export function ConfirmDeleteParcelaModal({
               WebkitBackdropFilter: 'blur(4px)',
             }}
           />
+          <div
+            style={{
+              position: 'fixed', inset: 0, zIndex: 61,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '0 16px', pointerEvents: 'none',
+            }}
+          >
           <motion.div
             key="modal"
             initial={{ opacity: 0, scale: 0.95, y: 8 }}
@@ -45,10 +52,8 @@ export function ConfirmDeleteParcelaModal({
             exit={{ opacity: 0, scale: 0.95, y: 8 }}
             transition={{ type: 'spring', damping: 28, stiffness: 320 }}
             style={{
-              position: 'fixed', zIndex: 61,
-              left: '50%', top: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 'min(340px, calc(100vw - 32px))',
+              pointerEvents: 'auto',
+              width: 'min(340px, 100%)',
               background: 'var(--bg-elevated)',
               border: '0.5px solid var(--border)',
               borderRadius: 16,
@@ -115,6 +120,7 @@ export function ConfirmDeleteParcelaModal({
               )}
             </div>
           </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>,

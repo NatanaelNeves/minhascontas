@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import { Cartao, CartaoInput, TipoCartao } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { formatMesLabel, centavosToDisplay, valorToCentStr } from '@/lib/utils'
+import { OPERADORAS_BENEFICIO } from '@/lib/cartoes'
 
 const TIPOS: { value: TipoCartao; label: string }[] = [
   { value: 'credito', label: 'Crédito' },
@@ -52,22 +53,44 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
   const [limiteCentStr, setLimiteCentStr] = useState('')
   const [diaFechamento, setDiaFechamento] = useState(1)
   const [diaVencimento, setDiaVencimento] = useState(10)
+  const [saldoAtualCentStr, setSaldoAtualCentStr] = useState('')
+  const [recargaMensalCentStr, setRecargaMensalCentStr] = useState('')
+  const [diaRecarga, setDiaRecarga] = useState<number | ''>('')
+  const [operadora, setOperadora] = useState('')
   const [cor, setCor] = useState(CORES_CARTAO[0])
 
   useEffect(() => {
     if (editando) {
       setNome(editando.nome)
       setTipo(editando.tipo)
-      setLimiteCentStr(valorToCentStr(editando.limite))
-      setDiaFechamento(editando.diaFechamento)
-      setDiaVencimento(editando.diaVencimento)
       setCor(editando.cor)
+      if (editando.tipo === 'credito') {
+        setLimiteCentStr(valorToCentStr(editando.limite))
+        setDiaFechamento(editando.diaFechamento)
+        setDiaVencimento(editando.diaVencimento)
+        setSaldoAtualCentStr('')
+        setRecargaMensalCentStr('')
+        setDiaRecarga('')
+        setOperadora('')
+      } else {
+        setLimiteCentStr('')
+        setDiaFechamento(1)
+        setDiaVencimento(10)
+        setSaldoAtualCentStr(valorToCentStr(editando.saldoAtual))
+        setRecargaMensalCentStr(valorToCentStr(editando.recargaMensal ?? 0))
+        setDiaRecarga(editando.diaRecarga ?? '')
+        setOperadora(editando.operadora ?? '')
+      }
     } else {
       setNome('')
       setTipo('credito')
       setLimiteCentStr('')
       setDiaFechamento(1)
       setDiaVencimento(10)
+      setSaldoAtualCentStr('')
+      setRecargaMensalCentStr('')
+      setDiaRecarga('')
+      setOperadora('')
       setCor(CORES_CARTAO[0])
     }
   }, [editando, open])
@@ -85,21 +108,45 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
   }, [open])
 
   function getCents() { return parseInt(limiteCentStr || '0', 10) }
+  function getSaldoCents() { return parseInt(saldoAtualCentStr || '0', 10) }
+  function getRecargaCents() { return parseInt(recargaMensalCentStr || '0', 10) }
 
   function handleSave() {
-    if (!nome.trim() || getCents() <= 0) return
-    onSave({
-      nome: nome.trim(),
-      tipo,
-      limite: getCents() / 100,
-      diaFechamento,
-      diaVencimento,
-      cor,
-    })
+    if (!nome.trim()) return
+
+    if (tipo === 'credito') {
+      if (getCents() <= 0) return
+      onSave({
+        nome: nome.trim(),
+        tipo,
+        limite: getCents() / 100,
+        diaFechamento,
+        diaVencimento,
+        cor,
+      })
+    } else {
+      if (getSaldoCents() <= 0) return
+      onSave({
+        nome: nome.trim(),
+        tipo,
+        saldoAtual: getSaldoCents() / 100,
+        operadora: tipo === 'outros_beneficios' ? undefined : operadora.trim() || undefined,
+        recargaMensal: tipo === 'outros_beneficios' ? undefined : getRecargaCents() / 100,
+        diaRecarga: tipo === 'outros_beneficios' ? undefined : (diaRecarga === '' ? null : diaRecarga),
+        cor,
+      })
+    }
+
     onClose()
   }
 
-  const canSave = nome.trim().length > 0 && getCents() > 0
+  const canSave = (() => {
+    if (!nome.trim()) return false
+    if (tipo === 'credito') return getCents() > 0
+    if (getSaldoCents() <= 0) return false
+    if (tipo !== 'outros_beneficios' && !operadora.trim()) return false
+    return true
+  })()
 
   function focusInput(e: React.FocusEvent<HTMLInputElement>) {
     e.target.style.borderColor = 'var(--border-strong)'
@@ -140,10 +187,9 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
               width: 'min(420px, 100vw)',
               background: 'var(--bg-elevated)',
               borderLeft: '0.5px solid var(--border)',
-              display: 'flex', flexDirection: 'column',
+              display: 'grid', gridTemplateRows: 'auto 1fr auto', overflow: 'hidden',
             }}
           >
-            {/* Header */}
             <div style={{ padding: '18px 22px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div>
                 <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 3 }}>
@@ -163,16 +209,13 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
               </button>
             </div>
 
-            {/* Body */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '22px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-              {/* Nome */}
+            <div className="no-scrollbar" style={{ overflowY: 'auto', minHeight: 0, padding: '22px', display: 'flex', flexDirection: 'column', gap: 20, scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}>
               <div>
                 <Label>Nome</Label>
                 <input
                   value={nome}
                   onChange={e => setNome(e.target.value)}
-                  placeholder="ex: Nubank, VR, Alelo..."
+                  placeholder={tipo === 'credito' ? 'ex: Nubank, Inter, C6...' : 'ex: VR, Ticket, Alelo...'}
                   autoFocus
                   style={baseInput}
                   onFocus={focusInput}
@@ -180,7 +223,6 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
                 />
               </div>
 
-              {/* Tipo — chips */}
               <div>
                 <Label>Tipo</Label>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -206,56 +248,164 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
                 </div>
               </div>
 
-              {/* Limite */}
-              <div>
-                <Label>Limite (R$)</Label>
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)', pointerEvents: 'none', userSelect: 'none' }}>
-                    R$
-                  </span>
-                  <input
-                    value={centavosToDisplay(limiteCentStr)}
-                    onChange={e => setLimiteCentStr(e.target.value.replace(/\D/g, ''))}
-                    placeholder="0,00"
-                    inputMode="numeric"
-                    style={{ ...baseInput, paddingLeft: 46, fontSize: 24, fontWeight: 700, letterSpacing: '-0.04em', height: 58 }}
-                    onFocus={focusInput}
-                    onBlur={blurInput}
-                  />
-                </div>
-              </div>
+              {tipo === 'credito' && (
+                <>
+                  <div>
+                    <Label>Limite total</Label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)', pointerEvents: 'none', userSelect: 'none' }}>
+                        R$
+                      </span>
+                      <input
+                        value={centavosToDisplay(limiteCentStr)}
+                        onChange={e => setLimiteCentStr(e.target.value.replace(/\D/g, ''))}
+                        placeholder="0,00"
+                        inputMode="numeric"
+                        style={{ ...baseInput, paddingLeft: 46, fontSize: 24, fontWeight: 700, letterSpacing: '-0.04em', height: 58 }}
+                        onFocus={focusInput}
+                        onBlur={blurInput}
+                      />
+                    </div>
+                  </div>
 
-              {/* Dia de fechamento + vencimento */}
-              <div style={{ display: 'flex', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <Label>Fecha todo dia</Label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={31}
-                    value={diaFechamento}
-                    onChange={e => setDiaFechamento(Math.min(31, Math.max(1, Number(e.target.value))))}
-                    style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
-                    onFocus={focusInput}
-                    onBlur={blurInput}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <Label>Vence todo dia</Label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={31}
-                    value={diaVencimento}
-                    onChange={e => setDiaVencimento(Math.min(31, Math.max(1, Number(e.target.value))))}
-                    style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
-                    onFocus={focusInput}
-                    onBlur={blurInput}
-                  />
-                </div>
-              </div>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <Label>Dia de fechamento</Label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={31}
+                        value={diaFechamento}
+                        onChange={e => setDiaFechamento(Math.min(31, Math.max(1, Number(e.target.value))))}
+                        placeholder="Fatura fecha todo dia X"
+                        style={{ ...baseInput, textAlign: 'center', fontSize: 18, fontWeight: 700 }}
+                        onFocus={focusInput}
+                        onBlur={blurInput}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <Label>Dia de vencimento</Label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={31}
+                        value={diaVencimento}
+                        onChange={e => setDiaVencimento(Math.min(31, Math.max(1, Number(e.target.value))))}
+                        placeholder="Fatura vence todo dia X"
+                        style={{ ...baseInput, textAlign: 'center', fontSize: 18, fontWeight: 700 }}
+                        onFocus={focusInput}
+                        onBlur={blurInput}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
-              {/* Cor */}
+              {tipo !== 'credito' && tipo !== 'outros_beneficios' && (
+                <div>
+                  <Label>Operadora</Label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {OPERADORAS_BENEFICIO.map(op => {
+                      const sel = operadora === op
+                      return (
+                        <button
+                          key={op}
+                          type="button"
+                          onClick={() => setOperadora(op)}
+                          style={{
+                            padding: '7px 12px', borderRadius: 99, fontSize: 12, fontWeight: 500,
+                            cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s', letterSpacing: '-0.01em',
+                            border: sel ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                            background: sel ? 'var(--text-primary)' : 'var(--bg-surface)',
+                            color: sel ? 'var(--bg-base)' : 'var(--text-secondary)',
+                          }}
+                        >
+                          {op}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {tipo !== 'credito' && (
+                <>
+                  <div>
+                    <Label>Saldo atual</Label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)', pointerEvents: 'none', userSelect: 'none' }}>
+                        R$
+                      </span>
+                      <input
+                        value={centavosToDisplay(saldoAtualCentStr)}
+                        onChange={e => setSaldoAtualCentStr(e.target.value.replace(/\D/g, ''))}
+                        placeholder="0,00"
+                        inputMode="numeric"
+                        style={{ ...baseInput, paddingLeft: 46, fontSize: 24, fontWeight: 700, letterSpacing: '-0.04em', height: 58 }}
+                        onFocus={focusInput}
+                        onBlur={blurInput}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Recarga mensal</Label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)', pointerEvents: 'none', userSelect: 'none' }}>
+                        R$
+                      </span>
+                      <input
+                        value={centavosToDisplay(recargaMensalCentStr)}
+                        onChange={e => setRecargaMensalCentStr(e.target.value.replace(/\D/g, ''))}
+                        placeholder="0,00"
+                        inputMode="numeric"
+                        style={{ ...baseInput, paddingLeft: 46, fontSize: 18, fontWeight: 700, letterSpacing: '-0.03em', height: 54 }}
+                        onFocus={focusInput}
+                        onBlur={blurInput}
+                      />
+                    </div>
+                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                      Pode ser 0 se o valor variar.
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label>Dia da recarga</Label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={diaRecarga}
+                      onChange={e => setDiaRecarga(e.target.value ? Math.min(31, Math.max(1, Number(e.target.value))) : '')}
+                      placeholder="Cai todo dia X"
+                      style={{ ...baseInput, textAlign: 'center', fontSize: 18, fontWeight: 700 }}
+                      onFocus={focusInput}
+                      onBlur={blurInput}
+                    />
+                  </div>
+                </>
+              )}
+
+              {tipo === 'outros_beneficios' && (
+                <div>
+                  <Label>Saldo atual</Label>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)', pointerEvents: 'none', userSelect: 'none' }}>
+                      R$
+                    </span>
+                    <input
+                      value={centavosToDisplay(saldoAtualCentStr)}
+                      onChange={e => setSaldoAtualCentStr(e.target.value.replace(/\D/g, ''))}
+                      placeholder="0,00"
+                      inputMode="numeric"
+                      style={{ ...baseInput, paddingLeft: 46, fontSize: 24, fontWeight: 700, letterSpacing: '-0.04em', height: 58 }}
+                      onFocus={focusInput}
+                      onBlur={blurInput}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <Label>Cor de identificação</Label>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -278,7 +428,6 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
               </div>
             </div>
 
-            {/* Footer */}
             <div style={{ padding: '14px 22px', borderTop: '0.5px solid var(--border)', display: 'flex', gap: 8, flexShrink: 0 }}>
               <button
                 onClick={onClose}

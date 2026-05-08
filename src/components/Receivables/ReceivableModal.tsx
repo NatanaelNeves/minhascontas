@@ -62,6 +62,7 @@ export function ReceivableModal({ open, editando, onSave, onClose }: Props) {
   const [centStr, setCentStr] = useState('')
   const [dataPrevista, setDataPrevista] = useState('')
   const [recebido, setRecebido] = useState(false)
+  const [recorrente, setRecorrente] = useState(false)
 
   useEffect(() => {
     if (editando) {
@@ -69,11 +70,13 @@ export function ReceivableModal({ open, editando, onSave, onClose }: Props) {
       setCentStr(valorToCentStr(editando.valor))
       setDataPrevista(editando.dataPrevista ?? '')
       setRecebido(editando.recebido)
+      setRecorrente(editando.recorrente ?? false)
     } else {
       setNome('')
       setCentStr('')
       setDataPrevista('')
       setRecebido(false)
+      setRecorrente(false)
     }
   }, [editando, open])
 
@@ -98,6 +101,7 @@ export function ReceivableModal({ open, editando, onSave, onClose }: Props) {
       valor: getCents() / 100,
       dataPrevista: dataPrevista || null,
       recebido,
+      recorrente,
     })
     onClose()
   }
@@ -143,7 +147,7 @@ export function ReceivableModal({ open, editando, onSave, onClose }: Props) {
               width: 'min(420px, 100vw)',
               background: 'var(--bg-elevated)',
               borderLeft: '0.5px solid var(--border)',
-              display: 'flex', flexDirection: 'column',
+              display: 'grid', gridTemplateRows: 'auto 1fr auto', overflow: 'hidden',
             }}
           >
             {/* Header */}
@@ -167,7 +171,7 @@ export function ReceivableModal({ open, editando, onSave, onClose }: Props) {
             </div>
 
             {/* Body */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '22px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div className="no-scrollbar" style={{ overflowY: 'auto', minHeight: 0, padding: '22px', display: 'flex', flexDirection: 'column', gap: 20, scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}>
 
               {/* Nome */}
               <div>
@@ -213,6 +217,23 @@ export function ReceivableModal({ open, editando, onSave, onClose }: Props) {
                   onFocus={focusInput}
                   onBlur={blurInput}
                 />
+              </div>
+
+              {/* Recebe todo mês — toggle */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '12px 14px', background: 'var(--bg-surface)',
+                border: '1px solid var(--border)', borderRadius: 10,
+              }}>
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                    Recebe todo mês
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                    Aparece automaticamente em todos os meses
+                  </p>
+                </div>
+                <Toggle on={recorrente} onToggle={() => setRecorrente(v => !v)} />
               </div>
 
               {/* Já recebido — toggle */}

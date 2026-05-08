@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
-import { Transacao, BancoComSaldo, CategoriaGasto } from '@/types'
+import { Transacao, BancoComSaldo, CategoriaGasto, Cartao } from '@/types'
 import { formatBRL } from '@/lib/utils'
 import { ConfirmDeleteModal } from '@/components/Modals/ConfirmDeleteModal'
+import { getLabelTipoCartao, isCartaoCredito } from '@/lib/cartoes'
 
 const CATEGORIA_EMOJI: Record<CategoriaGasto, string> = {
   alimentacao: '🍔',
@@ -20,14 +21,19 @@ const CATEGORIA_EMOJI: Record<CategoriaGasto, string> = {
 interface Props {
   transacao: Transacao
   bancos: BancoComSaldo[]
+  cartoes: Cartao[]
   onEdit: (t: Transacao) => void
   onDelete: (id: string) => void
 }
 
-export function TransactionItem({ transacao: t, bancos, onEdit, onDelete }: Props) {
+export function TransactionItem({ transacao: t, bancos, cartoes, onEdit, onDelete }: Props) {
   const [hovered, setHovered] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const banco = bancos.find(b => b.id === t.bancoId)
+  const cartao = t.cartaoId ? cartoes.find(c => c.id === t.cartaoId) ?? null : null
+  const labelOrigem = cartao
+    ? `${cartao.nome}${isCartaoCredito(cartao) ? ' · Crédito' : ` · ${getLabelTipoCartao(cartao.tipo)}`}`
+    : banco?.nome
   const isReadOnly = !!t.origem
   const emoji = t.tipo === 'gasto' ? CATEGORIA_EMOJI[t.categoria] : '💰'
 
@@ -49,12 +55,12 @@ export function TransactionItem({ transacao: t, bancos, onEdit, onDelete }: Prop
             {t.descricao}
           </p>
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-            {banco && (
+            {labelOrigem && (
               <span
                 className="inline-block text-[10px] px-2 py-0.5 rounded-full"
                 style={{ background: 'var(--bg-elevated)', color: 'var(--text-tertiary)' }}
               >
-                {banco.nome}
+                {labelOrigem}
               </span>
             )}
             <span

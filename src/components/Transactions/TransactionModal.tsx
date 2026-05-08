@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { Transacao, TransacaoInput, BancoComSaldo, TipoTransacao, Cartao } from '@/types'
+import { Transacao, TransacaoInput, BancoComSaldo, TipoTransacao, Cartao, FormaPagamentoTransacao } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { formatMesLabel, centavosToDisplay, valorToCentStr } from '@/lib/utils'
+import { isCartaoBeneficio, isCartaoCredito } from '@/lib/cartoes'
 
 const CATEGORIAS: { value: string; label: string; emoji: string }[] = [
   { value: 'alimentacao', label: 'Alimentação', emoji: '🍔' },
@@ -54,6 +55,7 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
   const { mesAtivo } = useAppStore()
   const hoje = new Date().toISOString().split('T')[0]
   const [tipo, setTipo] = useState<TipoTransacao>('gasto')
+  const [formaPagamento, setFormaPagamento] = useState<FormaPagamentoTransacao>('pix')
   const [descricao, setDescricao] = useState('')
   const [centStr, setCentStr] = useState('')
   const [bancoId, setBancoId] = useState('')
@@ -64,15 +66,32 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
   const [data, setData] = useState(hoje)
   const [observacao, setObservacao] = useState('')
 
-  const creditCartoes = cartoes.filter(c => c.tipo === 'credito')
+  const creditCartoes = cartoes.filter(isCartaoCredito)
+  const beneficioCartoes = cartoes.filter(isCartaoBeneficio)
+
+  const formasComBanco = ['pix', 'debito', 'boleto']
+  const formasComCartaoCredito = ['credito']
+  const formasComBeneficio = ['vale_alimentacao', 'vale_refeicao', 'vale_combustivel']
 
   useEffect(() => {
     if (editando) {
       setTipo(editando.tipo)
       setDescricao(editando.descricao)
       setCentStr(valorToCentStr(editando.valor))
-      setBancoId(editando.bancoId)
+      setBancoId(editando.bancoId ?? '')
       setCartaoId(editando.cartaoId)
+      const cartaoEditando = cartoes.find(c => c.id === editando.cartaoId)
+      if (editando.formaPagamento) {
+        setFormaPagamento(editando.formaPagamento)
+      } else if (cartaoEditando?.tipo === 'credito') {
+        setFormaPagamento('credito')
+      } else if (cartaoEditando && isCartaoBeneficio(cartaoEditando)) {
+        setFormaPagamento(cartaoEditando.tipo)
+      } else if (editando.bancoId) {
+        setFormaPagamento('pix')
+      } else {
+        setFormaPagamento('pix')
+      }
       setData(editando.data)
       setObservacao(editando.observacao ?? '')
       if (editando.tipo === 'gasto') {
@@ -83,6 +102,7 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
       }
     } else {
       setTipo('gasto')
+      setFormaPagamento('pix')
       setDescricao('')
       setCentStr('')
       setBancoId(bancos[0]?.id ?? '')
@@ -110,26 +130,39 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
   function getCents(): number { return parseInt(centStr || '0', 10) }
 
   function handleSave() {
-    if (!descricao.trim() || getCents() <= 0 || !bancoId) return
+    if (!descricao.trim() || getCents() <= 0) return
+
+    const usaBanco = formasComBanco.includes(formaPagamento)
+    const usaCartaoCredito = formasComCartaoCredito.includes(formaPagamento)
+    const usaBeneficio = formasComBeneficio.includes(formaPagamento)
+
+    if (usaBanco && !bancoId) return
+    if ((usaCartaoCredito || usaBeneficio) && !cartaoId) return
+
     const base = {
       descricao: descricao.trim(),
       valor: getCents() / 100,
-      bancoId,
       data,
       despesaFixa: false,
+      formaPagamento,
+      ...(usaBanco && bancoId ? { bancoId } : {}),
+      ...(cartaoId ? { cartaoId } : {}),
       ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
     }
     const categoriaFinal = customMode && customInput.trim() ? customInput.trim() : categoria
     const input: TransacaoInput =
       tipo === 'gasto'
-        ? { ...base, tipo: 'gasto', categoria: categoriaFinal, ...(cartaoId ? { cartaoId } : {}) }
+        ? { ...base, tipo: 'gasto', categoria: categoriaFinal }
         : { ...base, tipo: 'entrada' }
     onSave(input)
     onClose()
   }
 
   const categoriaValida = tipo !== 'gasto' || (customMode ? customInput.trim().length > 0 : true)
-  const canSave = descricao.trim().length > 0 && getCents() > 0 && !!bancoId && categoriaValida
+  const usaBanco = formasComBanco.includes(formaPagamento)
+  const usaCartaoCredito = formasComCartaoCredito.includes(formaPagamento)
+  const usaBeneficio = formasComBeneficio.includes(formaPagamento)
+  const canSave = descricao.trim().length > 0 && getCents() > 0 && categoriaValida && (!usaBanco || !!bancoId) && (!usaCartaoCredito && !usaBeneficio || !!cartaoId)
 
   function focusInput(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
     e.target.style.borderColor = 'var(--border-strong)'
@@ -170,7 +203,7 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
               width: 'min(420px, 100vw)',
               background: 'var(--bg-elevated)',
               borderLeft: '0.5px solid var(--border)',
-              display: 'flex', flexDirection: 'column',
+              display: 'grid', gridTemplateRows: 'auto 1fr auto', overflow: 'hidden',
             }}
           >
             {/* Header */}
@@ -194,7 +227,7 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
             </div>
 
             {/* Body */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '22px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div className="no-scrollbar" style={{ overflowY: 'auto', minHeight: 0, padding: '22px', display: 'flex', flexDirection: 'column', gap: 20, scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}>
 
               {/* Tipo — segmented control, white active */}
               <div>
@@ -252,8 +285,45 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
                 </div>
               </div>
 
+              {/* Forma de pagamento */}
+              <div>
+                <Label>Forma de pagamento</Label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {[
+                    { value: 'pix', label: 'Pix' },
+                    { value: 'debito', label: 'Débito' },
+                    { value: 'boleto', label: 'Boleto' },
+                    { value: 'credito', label: 'Crédito' },
+                    { value: 'vale_alimentacao', label: 'VA' },
+                    { value: 'vale_refeicao', label: 'VR' },
+                    { value: 'vale_combustivel', label: 'Combustível' },
+                  ].map(opt => {
+                    const sel = formaPagamento === opt.value
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          setFormaPagamento(opt.value as FormaPagamentoTransacao)
+                          setCartaoId(undefined)
+                        }}
+                        style={{
+                          padding: '7px 12px', borderRadius: 99, fontSize: 12, fontWeight: 500,
+                          cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s', letterSpacing: '-0.01em',
+                          border: sel ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                          background: sel ? 'var(--text-primary)' : 'var(--bg-surface)',
+                          color: sel ? 'var(--bg-base)' : 'var(--text-secondary)',
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
               {/* Banco — chips */}
-              {bancos.length > 0 && (
+              {formasComBanco.includes(formaPagamento) && bancos.length > 0 && (
                 <div>
                   <Label>Banco</Label>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -277,6 +347,74 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
                       )
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* Cartão de crédito */}
+              {formasComCartaoCredito.includes(formaPagamento) && (
+                <div>
+                  <Label>Qual cartão de crédito?</Label>
+                  {creditCartoes.length === 0 ? (
+                    <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Nenhum cartão de crédito cadastrado.</p>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {creditCartoes.map(c => {
+                        const sel = cartaoId === c.id
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => setCartaoId(c.id)}
+                            style={{
+                              padding: '7px 14px', borderRadius: 99, fontSize: 12, fontWeight: 500,
+                              cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s', letterSpacing: '-0.01em',
+                              border: sel ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                              background: sel ? 'var(--text-primary)' : 'var(--bg-surface)',
+                              color: sel ? 'var(--bg-base)' : 'var(--text-secondary)',
+                            }}
+                          >
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: sel ? 'var(--bg-base)' : c.cor, flexShrink: 0, display: 'inline-block', marginRight: 6 }} />
+                            {c.nome}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Cartão de benefício */}
+              {formasComBeneficio.includes(formaPagamento) && (
+                <div>
+                  <Label>Qual cartão benefício?</Label>
+                  {beneficioCartoes.filter(c => c.tipo === formaPagamento).length === 0 ? (
+                    <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Nenhum cartão dessa categoria cadastrado.</p>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {beneficioCartoes
+                        .filter(c => c.tipo === formaPagamento)
+                        .map(c => {
+                          const sel = cartaoId === c.id
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => setCartaoId(c.id)}
+                              style={{
+                                padding: '7px 14px', borderRadius: 99, fontSize: 12, fontWeight: 500,
+                                cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s', letterSpacing: '-0.01em',
+                                border: sel ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                                background: sel ? 'var(--text-primary)' : 'var(--bg-surface)',
+                                color: sel ? 'var(--bg-base)' : 'var(--text-secondary)',
+                              }}
+                            >
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: sel ? 'var(--bg-base)' : c.cor, flexShrink: 0, display: 'inline-block', marginRight: 6 }} />
+                              {c.nome}
+                            </button>
+                          )
+                        })}
+                    </div>
+                  )}
                 </div>
               )}
 

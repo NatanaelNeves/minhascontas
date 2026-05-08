@@ -29,7 +29,7 @@ export function Header() {
         borderBottom: '0.5px solid var(--border)',
       }}
     >
-      <div className="max-w-2xl mx-auto px-5 h-[52px] flex items-center justify-between gap-3">
+      <div className="max-w-[480px] mx-auto px-4 h-[52px] flex items-center justify-between gap-3 w-full">
 
         {/* Logo */}
         <button

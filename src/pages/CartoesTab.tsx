@@ -1,8 +1,9 @@
-import { CartaoComSaldo, CartaoInput, FaturaCartao, BancoComSaldo } from '@/types'
+import { CartaoComSaldo, CartaoInput, Conta, FaturaCartao, BancoComSaldo } from '@/types'
 import { CartoesList } from '@/components/Cartoes/CartoesList'
 
 interface Props {
   cartoes: CartaoComSaldo[]
+  contas: Conta[]
   faturas: FaturaCartao[]
   bancos: BancoComSaldo[]
   onAdd: (data: CartaoInput) => void

@@ -7,23 +7,64 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
+  deleteField,
   QueryDocumentSnapshot,
   DocumentData,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Cartao, CartaoInput } from '@/types'
+import { Cartao, CartaoInput, CartaoCredito, CartaoBeneficio } from '@/types'
+import { isTipoBeneficio } from '@/lib/cartoes'
 
 function docToCartao(snap: QueryDocumentSnapshot<DocumentData>): Cartao {
   const d = snap.data()
+  const tipo = d.tipo as Cartao['tipo']
+
+  if (isTipoBeneficio(tipo)) {
+    return {
+      id: snap.id,
+      nome: d.nome,
+      tipo,
+      saldoAtual: typeof d.saldoAtual === 'number' ? d.saldoAtual : (typeof d.limite === 'number' ? d.limite : 0),
+      operadora: d.operadora ?? undefined,
+      recargaMensal: typeof d.recargaMensal === 'number' ? d.recargaMensal : undefined,
+      diaRecarga: typeof d.diaRecarga === 'number' ? d.diaRecarga : null,
+      cor: d.cor,
+      criadoEm: d.criadoEm?.toDate() ?? new Date(),
+    } satisfies CartaoBeneficio
+  }
+
   return {
     id: snap.id,
     nome: d.nome,
-    tipo: d.tipo,
-    limite: d.limite,
-    diaFechamento: d.diaFechamento,
-    diaVencimento: d.diaVencimento,
+    tipo: 'credito',
+    limite: typeof d.limite === 'number' ? d.limite : 0,
+    diaFechamento: typeof d.diaFechamento === 'number' ? d.diaFechamento : 1,
+    diaVencimento: typeof d.diaVencimento === 'number' ? d.diaVencimento : 10,
     cor: d.cor,
     criadoEm: d.criadoEm?.toDate() ?? new Date(),
+  } satisfies CartaoCredito
+}
+
+function serializeCartaoInput(c: CartaoInput) {
+  if (c.tipo === 'credito') {
+    return {
+      nome: c.nome,
+      tipo: c.tipo,
+      limite: c.limite,
+      diaFechamento: c.diaFechamento,
+      diaVencimento: c.diaVencimento,
+      cor: c.cor,
+    }
+  }
+
+  return {
+    nome: c.nome,
+    tipo: c.tipo,
+    saldoAtual: c.saldoAtual,
+    cor: c.cor,
+    ...(c.operadora ? { operadora: c.operadora } : {}),
+    ...(typeof c.recargaMensal === 'number' ? { recargaMensal: c.recargaMensal } : {}),
+    ...(typeof c.diaRecarga === 'number' || c.diaRecarga === null ? { diaRecarga: c.diaRecarga } : {}),
   }
 }
 
@@ -45,6 +86,18 @@ export function useCartoes(userId: string): UseCartoesReturn {
     if (!userId) return
     setIsLoading(true)
     const unsub = onSnapshot(collection(db, path), snap => {
+      snap.docs.forEach(async (docSnap) => {
+        const data = docSnap.data()
+        if (isTipoBeneficio(data.tipo) && typeof data.saldoAtual !== 'number') {
+          const saldoAtual = typeof data.limite === 'number' ? data.limite : 0
+          await updateDoc(doc(db, path, docSnap.id), {
+            saldoAtual,
+            limite: deleteField(),
+            diaFechamento: deleteField(),
+            diaVencimento: deleteField(),
+          })
+        }
+      })
       setCartoes(snap.docs.map(docToCartao))
       setIsLoading(false)
     })
@@ -52,11 +105,33 @@ export function useCartoes(userId: string): UseCartoesReturn {
   }, [userId])
 
   async function addCartao(c: CartaoInput) {
-    await addDoc(collection(db, path), { ...c, criadoEm: serverTimestamp() })
+    await addDoc(collection(db, path), { ...serializeCartaoInput(c), criadoEm: serverTimestamp() })
   }
 
   async function updateCartao(id: string, data: Partial<CartaoInput>) {
-    await updateDoc(doc(db, path, id), data)
+    await updateDoc(doc(db, path, id), data.tipo === 'credito'
+      ? {
+          ...data,
+          limite: data.limite,
+          diaFechamento: data.diaFechamento,
+          diaVencimento: data.diaVencimento,
+          saldoAtual: deleteField(),
+          operadora: deleteField(),
+          recargaMensal: deleteField(),
+          diaRecarga: deleteField(),
+        }
+      : data.tipo
+        ? {
+            ...data,
+            saldoAtual: data.saldoAtual,
+            operadora: data.operadora ?? null,
+            recargaMensal: data.recargaMensal ?? null,
+            diaRecarga: data.diaRecarga ?? null,
+            limite: deleteField(),
+            diaFechamento: deleteField(),
+            diaVencimento: deleteField(),
+          }
+        : data)
   }
 
   async function deleteCartao(id: string) {

@@ -29,18 +29,16 @@ export function BottomNav({ ativa, onChange }: Props) {
       style={{
         background: 'var(--bg-surface)',
         borderTop: '0.5px solid var(--border)',
-        height: 56,
         paddingBottom: 'env(safe-area-inset-bottom)',
-        overflowX: 'auto',
-        scrollbarWidth: 'none',
       }}
     >
       <div
         style={{
+          maxWidth: 480,
+          margin: '0 auto',
+          height: 56,
           display: 'flex',
           alignItems: 'center',
-          minWidth: 'max-content',
-          height: '100%',
           paddingLeft: 4,
           paddingRight: 4,
         }}
