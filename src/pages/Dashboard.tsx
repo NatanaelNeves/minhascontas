@@ -37,6 +37,7 @@ export function Dashboard({ userId }: { userId: string }) {
     copiarFixos,
     mesExiste,
     propagarSaldosBancos,
+    propagarFaturasNaoPagas,
     criarContaComParcelas,
     excluirParcelamentosRestantes,
   } = useMonth(userId)
@@ -55,6 +56,7 @@ export function Dashboard({ userId }: { userId: string }) {
   const {
     transacoes,
     totalGastosVariaveis,
+    totalGastosBeneficios,
     gastosPorCategoria,
     gastosPorDia,
     addTransacao,
@@ -159,6 +161,7 @@ export function Dashboard({ userId }: { userId: string }) {
   async function handleCopiarFixos() {
     await criarMes(mesAtivo, 0)
     await propagarSaldosBancos(mesOrigemId)
+    await propagarFaturasNaoPagas(mesOrigemId, mesAtivo)
     await copiarFixos(mesOrigemId, mesAtivo)
     await criarTransacoesParaMes(mesAtivo)
     setCopiarModalOpen(false)
@@ -221,6 +224,7 @@ export function Dashboard({ userId }: { userId: string }) {
                 bancos={bancos}
                 cartoesComSaldo={cartoesComSaldo}
                 totalGastosVariaveis={totalGastosVariaveis}
+                totalGastosBeneficios={totalGastosBeneficios}
                 totalPendente={totalPendente}
                 nRecebiveis={recebiveis.length}
                 gastosPorCategoria={gastosPorCategoria}
@@ -287,6 +291,7 @@ export function Dashboard({ userId }: { userId: string }) {
               <CartoesTab
                 cartoes={cartoesComSaldo}
                 contas={contas}
+                transacoes={transacoes}
                 faturas={faturas}
                 bancos={bancos}
                 gastosRecorrentes={gastosRecorrentes}
@@ -364,6 +369,7 @@ export function Dashboard({ userId }: { userId: string }) {
         onPular={async () => {
           await criarMes(mesAtivo, 0)
           await propagarSaldosBancos(mesOrigemId)
+          await propagarFaturasNaoPagas(mesOrigemId, mesAtivo)
           await criarTransacoesParaMes(mesAtivo)
           setCopiarModalOpen(false)
         }}

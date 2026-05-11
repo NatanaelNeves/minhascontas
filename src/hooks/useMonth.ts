@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { ContaInput, MesInfo } from '@/types'
-import { nextMesId } from '@/lib/utils'
+import { nextMesId, mesIdToShortLabel } from '@/lib/utils'
 import { useAppStore } from '@/store/useAppStore'
 
 interface UseMonthReturn {
@@ -25,6 +25,7 @@ interface UseMonthReturn {
   copiarFixos: (mesOrigemId: string, mesDestinoId: string) => Promise<void>
   mesExiste: (mesId: string) => Promise<boolean>
   propagarSaldosBancos: (mesAnteriorId: string) => Promise<void>
+  propagarFaturasNaoPagas: (mesAnteriorId: string, mesDestinoId: string) => Promise<void>
   criarContaComParcelas: (
     conta: ContaInput,
     parcelaTotal: number,
@@ -205,5 +206,49 @@ export function useMonth(userId: string): UseMonthReturn {
     }
   }
 
-  return { mesInfo, isLoading, setReceita, criarMes, copiarFixos, mesExiste, propagarSaldosBancos, criarContaComParcelas, excluirParcelamentosRestantes }
+  async function propagarFaturasNaoPagas(mesAnteriorId: string, mesDestinoId: string): Promise<void> {
+    const cartoesSnap = await getDocs(collection(db, `users/${userId}/cartoes`))
+    const cartoesCredito = cartoesSnap.docs.filter(d => d.data().tipo === 'credito')
+    if (cartoesCredito.length === 0) return
+
+    const txsSnap = await getDocs(collection(db, `users/${userId}/months/${mesAnteriorId}/transactions`))
+    const billsDestinoSnap = await getDocs(collection(db, `users/${userId}/months/${mesDestinoId}/bills`))
+
+    for (const cartaoDoc of cartoesCredito) {
+      const cartao = cartaoDoc.data()
+      const cartaoId = cartaoDoc.id
+
+      const faturaSnap = await getDoc(doc(db, `users/${userId}/months/${mesAnteriorId}/faturas/${cartaoId}`))
+      if (faturaSnap.exists() && faturaSnap.data()?.pago === true) continue
+
+      const totalAvulso = txsSnap.docs.reduce((sum, d) => {
+        const data = d.data()
+        if (data.cartaoId === cartaoId && data.tipo === 'gasto') return sum + (data.valor as number)
+        return sum
+      }, 0)
+      if (totalAvulso <= 0) continue
+
+      const jaExiste = billsDestinoSnap.docs.some(d => {
+        const data = d.data()
+        return data.origem?.tipo === 'fatura_propagada' && data.origem?.mesOrigem === mesAnteriorId && data.cartaoId === cartaoId
+      })
+      if (jaExiste) continue
+
+      const mesLabel = mesIdToShortLabel(mesAnteriorId)
+      await addDoc(collection(db, `users/${userId}/months/${mesDestinoId}/bills`), {
+        nome: `Fatura ${cartao.nome} (${mesLabel})`,
+        valor: totalAvulso,
+        categoria: 'cartao',
+        formaPagamento: 'credito',
+        vencimento: null,
+        pago: false,
+        parcelas: null,
+        cartaoId,
+        origem: { tipo: 'fatura_propagada', mesOrigem: mesAnteriorId, cartaoId },
+        criadoEm: serverTimestamp(),
+      })
+    }
+  }
+
+  return { mesInfo, isLoading, setReceita, criarMes, copiarFixos, mesExiste, propagarSaldosBancos, propagarFaturasNaoPagas, criarContaComParcelas, excluirParcelamentosRestantes }
 }

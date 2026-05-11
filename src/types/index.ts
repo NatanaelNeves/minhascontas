@@ -8,6 +8,12 @@ export interface Parcelas {
   total: number
 }
 
+export interface ContaOrigem {
+  tipo: 'fatura_propagada'
+  mesOrigem: string
+  cartaoId: string
+}
+
 export interface Conta {
   id: string
   nome: string
@@ -21,6 +27,7 @@ export interface Conta {
   cartaoId?: string
   pagamento?: { data: string; bancoId: string }
   recorrente?: boolean
+  origem?: ContaOrigem
   criadoEm: Date
 }
 

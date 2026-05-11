@@ -2,7 +2,7 @@ import { writeBatch, doc, serverTimestamp, deleteField } from 'firebase/firestor
 import { db } from '@/lib/firebase'
 import { useFirestore } from './useFirestore'
 import { calcResumo } from '@/lib/utils'
-import { Conta, ContaInput, ResumoMes } from '@/types'
+import { Conta, ContaInput, ResumoMes, ContaOrigem } from '@/types'
 
 interface UseBillsReturn {
   contas: Conta[]
@@ -17,6 +17,7 @@ interface UseBillsReturn {
     bancoId: string,
     contaData: { nome: string; valor: number; vencimento: string | null },
     dataPagamento: string,
+    origem?: ContaOrigem,
   ) => Promise<void>
   desfazerPagamento: (id: string) => Promise<void>
 }
@@ -43,6 +44,7 @@ export function useBills(
     bancoId: string,
     contaData: { nome: string; valor: number; vencimento: string | null },
     dataPagamento: string,
+    origem?: ContaOrigem,
   ) {
     const batch = writeBatch(db)
     batch.update(doc(db, billPath, id), {
@@ -60,6 +62,12 @@ export function useBills(
       origem: { tipo: 'bill', id },
       criadoEm: serverTimestamp(),
     })
+    if (origem?.tipo === 'fatura_propagada') {
+      batch.set(
+        doc(db, `users/${userId}/months/${origem.mesOrigem}/faturas/${origem.cartaoId}`),
+        { pago: true, dataPagamento, bancoId },
+      )
+    }
     await batch.commit()
   }
 

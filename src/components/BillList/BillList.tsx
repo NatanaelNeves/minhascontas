@@ -10,6 +10,7 @@ interface Props {
   onDelete: (id: string) => void
   onDeleteParcelamento?: (parcelamentoId: string, parcelaAtualFrom: number, parcelaTotal: number) => void
   onAdd: () => void
+  cartaoCores?: Record<string, string>
 }
 
 const CATEGORIAS = [
@@ -28,7 +29,7 @@ function sortContas(contas: Conta[]): Conta[] {
   })
 }
 
-export function BillList({ contas, onTogglePago, onEdit, onDelete, onDeleteParcelamento, onAdd }: Props) {
+export function BillList({ contas, onTogglePago, onEdit, onDelete, onDeleteParcelamento, onAdd, cartaoCores }: Props) {
   if (contas.length === 0) {
     return (
       <motion.div
@@ -114,6 +115,7 @@ export function BillList({ contas, onTogglePago, onEdit, onDelete, onDeleteParce
                     onEdit={onEdit}
                     onDelete={onDelete}
                     onDeleteParcelamento={onDeleteParcelamento}
+                    cartaoCor={cartaoCores?.[conta.cartaoId ?? '']}
                   />
                 ))}
               </AnimatePresence>

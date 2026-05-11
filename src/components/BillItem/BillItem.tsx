@@ -12,6 +12,7 @@ interface Props {
   onEdit: (conta: Conta) => void
   onDelete: (id: string) => void
   onDeleteParcelamento?: (parcelamentoId: string, parcelaAtualFrom: number, parcelaTotal: number) => void
+  cartaoCor?: string
 }
 
 const FORMA_LABEL: Record<string, string> = {
@@ -21,7 +22,7 @@ const FORMA_LABEL: Record<string, string> = {
   credito: 'Crédito',
 }
 
-export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcelamento }: Props) {
+export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcelamento, cartaoCor }: Props) {
   const [confirmando, setConfirmando] = useState(false)
   const [confirmParcelaOpen, setConfirmParcelaOpen] = useState(false)
   const { mesAtivo } = useAppStore()
@@ -49,6 +50,9 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcel
       style={{
         borderBottom: '0.5px solid var(--divider)',
         cursor: 'default',
+        ...(conta.origem?.tipo === 'fatura_propagada' && cartaoCor
+          ? { borderLeft: `2.5px solid ${cartaoCor}` }
+          : {}),
       }}
       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.025)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -171,6 +175,19 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcel
               }}
             >
               Vence em breve
+            </span>
+          )}
+
+          {conta.origem?.tipo === 'fatura_propagada' && (
+            <span
+              className="text-[10px] font-medium px-1.5 py-[2px] rounded-full"
+              style={{
+                background: 'var(--amber-muted)',
+                color: 'var(--amber)',
+                border: '0.5px solid rgba(245,158,11,0.2)',
+              }}
+            >
+              Fatura anterior
             </span>
           )}
         </div>

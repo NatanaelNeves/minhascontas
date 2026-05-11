@@ -6,7 +6,7 @@ import { BillModal } from '@/components/Modals/BillModal'
 import { PagarContaModal } from '@/components/Modals/PagarContaModal'
 import { SelectBancoModal } from '@/components/Modals/SelectBancoModal'
 import { ConfirmDeleteModal } from '@/components/Modals/ConfirmDeleteModal'
-import { Conta, ContaInput, BancoComSaldo, FaturaCalculada, Cartao } from '@/types'
+import { Conta, ContaInput, BancoComSaldo, FaturaCalculada, Cartao, ContaOrigem } from '@/types'
 import { formatBRL } from '@/lib/utils'
 
 interface Props {
@@ -20,6 +20,7 @@ interface Props {
     bancoId: string,
     contaData: { nome: string; valor: number; vencimento: string | null },
     dataPagamento: string,
+    origem?: ContaOrigem,
   ) => Promise<void>
   onDesfazerPagamento: (id: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
@@ -88,7 +89,7 @@ export function ContasTab({
       nome: pendingConta.nome,
       valor: pendingConta.valor,
       vencimento: pendingConta.vencimento,
-    }, data)
+    }, data, pendingConta.origem)
     setPendingToggleId(null)
   }
 
@@ -103,6 +104,11 @@ export function ContasTab({
     else onAdd(data)
     setEditando(null)
   }
+
+  const cartaoCores = useMemo(
+    () => Object.fromEntries(cartoes.map(c => [c.id, c.cor])),
+    [cartoes],
+  )
 
   const pagas = contas.filter(c => c.pago).length
   const total = contas.length
@@ -318,6 +324,7 @@ export function ContasTab({
         onDelete={onDelete}
         onAdd={() => { setEditando(null); setBillModalOpen(true) }}
         onDeleteParcelamento={onDeleteParcelamento}
+        cartaoCores={cartaoCores}
       />
 
       <BillModal
