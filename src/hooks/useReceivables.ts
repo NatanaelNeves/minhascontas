@@ -33,7 +33,7 @@ export interface UseReceivablesReturn {
   addRecebivel: (r: AReceberInput) => Promise<void>
   updateRecebivel: (id: string, data: Partial<AReceberInput>) => Promise<void>
   deleteRecebivel: (id: string) => Promise<void>
-  marcarRecebido: (id: string, bancoId: string) => Promise<void>
+  marcarRecebido: (id: string, bancoId: string, data: string) => Promise<void>
   desmarcarRecebido: (id: string) => Promise<void>
 }
 
@@ -113,10 +113,9 @@ export function useReceivables(userId: string, mesId: string): UseReceivablesRet
     await batch.commit()
   }
 
-  async function marcarRecebido(id: string, bancoId: string) {
+  async function marcarRecebido(id: string, bancoId: string, data: string) {
     const recebivel = recebiveis.find(r => r.id === id)
     if (!recebivel) return
-    const hoje = new Date().toISOString().split('T')[0]
     const isGlobal = globalRecebiveis.some(r => r.id === id)
     const batch = writeBatch(db)
     if (isGlobal) {
@@ -129,7 +128,7 @@ export function useReceivables(userId: string, mesId: string): UseReceivablesRet
       bancoId,
       valor: recebivel.valor,
       descricao: recebivel.nome,
-      data: recebivel.dataPrevista ?? hoje,
+      data,
       despesaFixa: false,
       origem: { tipo: 'receivable', id },
       criadoEm: serverTimestamp(),

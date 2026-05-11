@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2, RefreshCw } from 'lucide-react'
 import { Transacao, BancoComSaldo, CategoriaGasto, Cartao } from '@/types'
 import { formatBRL } from '@/lib/utils'
 import { ConfirmDeleteModal } from '@/components/Modals/ConfirmDeleteModal'
@@ -24,11 +24,13 @@ interface Props {
   cartoes: Cartao[]
   onEdit: (t: Transacao) => void
   onDelete: (id: string) => void
+  onCancelarRecorrente?: (recorrenteId: string) => void
 }
 
-export function TransactionItem({ transacao: t, bancos, cartoes, onEdit, onDelete }: Props) {
+export function TransactionItem({ transacao: t, bancos, cartoes, onEdit, onDelete, onCancelarRecorrente }: Props) {
   const [hovered, setHovered] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmCancelRec, setConfirmCancelRec] = useState(false)
   const banco = bancos.find(b => b.id === t.bancoId)
   const cartao = t.cartaoId ? cartoes.find(c => c.id === t.cartaoId) ?? null : null
   const labelOrigem = cartao
@@ -63,6 +65,15 @@ export function TransactionItem({ transacao: t, bancos, cartoes, onEdit, onDelet
                 {labelOrigem}
               </span>
             )}
+            {t.recorrenteId && (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(52,199,123,0.12)', color: 'var(--green)' }}
+              >
+                <RefreshCw className="w-2.5 h-2.5" />
+                Recorrente
+              </span>
+            )}
             <span
               className="inline-block text-[10px]"
               style={{ color: 'var(--text-disabled)' }}
@@ -78,34 +89,48 @@ export function TransactionItem({ transacao: t, bancos, cartoes, onEdit, onDelet
           >
             {t.tipo === 'gasto' ? '-' : '+'}{formatBRL(t.valor)}
           </span>
-          {!isReadOnly && (
-            <div
-              className="flex items-center gap-1"
-              style={{
-                opacity: hovered ? 1 : 0,
-                transition: 'opacity .15s',
-              }}
-            >
+          <div
+            className="flex items-center gap-1"
+            style={{
+              opacity: hovered ? 1 : 0,
+              transition: 'opacity .15s',
+            }}
+          >
+            {t.recorrenteId && onCancelarRecorrente && (
               <button
-                onClick={() => onEdit(t)}
+                onClick={() => setConfirmCancelRec(true)}
                 className="w-6 h-6 flex items-center justify-center rounded"
                 style={{ color: 'var(--text-tertiary)', transition: 'color .12s' }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                title="Cancelar recorrência"
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--amber)')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
               >
-                <Pencil className="w-3.5 h-3.5" />
+                <RefreshCw className="w-3.5 h-3.5" />
               </button>
-              <button
-                onClick={() => setConfirmOpen(true)}
-                className="w-6 h-6 flex items-center justify-center rounded"
-                style={{ color: 'var(--text-tertiary)', transition: 'color .12s' }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
+            )}
+            {!isReadOnly && (
+              <>
+                <button
+                  onClick={() => onEdit(t)}
+                  className="w-6 h-6 flex items-center justify-center rounded"
+                  style={{ color: 'var(--text-tertiary)', transition: 'color .12s' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setConfirmOpen(true)}
+                  className="w-6 h-6 flex items-center justify-center rounded"
+                  style={{ color: 'var(--text-tertiary)', transition: 'color .12s' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -115,6 +140,16 @@ export function TransactionItem({ transacao: t, bancos, cartoes, onEdit, onDelet
         descricao="Este lançamento será removido permanentemente."
         onConfirm={() => onDelete(t.id)}
         onClose={() => setConfirmOpen(false)}
+      />
+      <ConfirmDeleteModal
+        open={confirmCancelRec}
+        titulo="Cancelar recorrência?"
+        descricao="Este lançamento permanece. Nos próximos meses ele não será criado automaticamente."
+        onConfirm={() => {
+          if (t.recorrenteId && onCancelarRecorrente) onCancelarRecorrente(t.recorrenteId)
+          setConfirmCancelRec(false)
+        }}
+        onClose={() => setConfirmCancelRec(false)}
       />
     </>
   )

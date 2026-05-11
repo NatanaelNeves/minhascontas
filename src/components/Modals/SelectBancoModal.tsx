@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { BancoComSaldo } from '@/types'
 import { formatBRL } from '@/lib/utils'
@@ -5,12 +6,18 @@ import { formatBRL } from '@/lib/utils'
 interface Props {
   open: boolean
   bancos: BancoComSaldo[]
-  onSelect: (bancoId: string) => void
+  onSelect: (bancoId: string, data: string) => void
   onClose: () => void
   onNavigateToBancos?: () => void
 }
 
 export function SelectBancoModal({ open, bancos, onSelect, onClose, onNavigateToBancos }: Props) {
+  const [data, setData] = useState(() => new Date().toISOString().split('T')[0])
+
+  useEffect(() => {
+    if (open) setData(new Date().toISOString().split('T')[0])
+  }, [open])
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
@@ -20,6 +27,29 @@ export function SelectBancoModal({ open, bancos, onSelect, onClose, onNavigateTo
         <DialogHeader>
           <DialogTitle style={{ color: 'var(--text-primary)' }}>Selecionar banco</DialogTitle>
         </DialogHeader>
+
+        <div>
+          <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 8 }}>
+            Data do pagamento
+          </p>
+          <input
+            type="date"
+            value={data}
+            onChange={e => setData(e.target.value)}
+            style={{
+              width: '100%',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: '9px 12px',
+              fontSize: 14,
+              color: 'var(--text-primary)',
+              outline: 'none',
+              fontFamily: 'inherit',
+              colorScheme: 'dark',
+            } as React.CSSProperties}
+          />
+        </div>
 
         {bancos.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
@@ -41,7 +71,7 @@ export function SelectBancoModal({ open, bancos, onSelect, onClose, onNavigateTo
             {bancos.map(b => (
               <li key={b.id}>
                 <button
-                  onClick={() => onSelect(b.id)}
+                  onClick={() => onSelect(b.id, data)}
                   className="w-full flex items-center justify-between rounded-lg px-4 py-3 text-left transition-colors"
                   style={{
                     background: 'var(--bg-surface)',

@@ -5,7 +5,7 @@ import { formatBRL } from '@/lib/utils'
 interface Props {
   resumo: ResumoMes
   receita: number
-  totalGastos: number
+  totalGastosVariaveis: number
   onEditReceita: () => void
 }
 
@@ -25,8 +25,9 @@ function Row({ label, value, color, sign }: { label: string; value: number; colo
   )
 }
 
-export function HomeResumoMes({ resumo, receita, totalGastos, onEditReceita }: Props) {
-  const sobra = receita - resumo.totalGeral - totalGastos
+export function HomeResumoMes({ resumo, receita, totalGastosVariaveis, onEditReceita }: Props) {
+  const sobra = receita - resumo.totalPago - totalGastosVariaveis
+  const sobraSePageTudo = sobra - resumo.totalPendente
   const saude = sobra >= receita * 0.2 ? 'verde' : sobra >= 0 ? 'amarelo' : 'vermelho'
   const saudeColor = saude === 'verde' ? 'var(--green)' : saude === 'amarelo' ? 'var(--amber)' : 'var(--red)'
 
@@ -53,37 +54,39 @@ export function HomeResumoMes({ resumo, receita, totalGastos, onEditReceita }: P
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-              color: 'var(--text-secondary)', fontSize: 12, letterSpacing: '-0.01em',
+              color: receita === 0 ? 'var(--amber)' : 'var(--text-secondary)',
+              fontSize: 12, letterSpacing: '-0.01em',
               fontFamily: 'inherit',
             }}
             onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+            onMouseLeave={e => (e.currentTarget.style.color = receita === 0 ? 'var(--amber)' : 'var(--text-secondary)')}
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M1.5 8.5h7M6.5 1.5L8.5 3.5 4 8 2 8.5l.5-2 4-4z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Receita
+            {receita === 0 ? 'Definir receita' : 'Receita'}
           </button>
           <span style={{
-            fontSize: 13, fontWeight: 600, color: 'var(--text-primary)',
+            fontSize: 13, fontWeight: 600,
+            color: receita === 0 ? 'var(--text-tertiary)' : 'var(--text-primary)',
             letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
           }}>
-            {receita > 0 ? formatBRL(receita) : '—'}
+            {formatBRL(receita)}
           </span>
         </div>
 
-        {resumo.totalGeral > 0 && (
-          <Row label="(-) Contas cadastradas" value={resumo.totalGeral} color="var(--text-secondary)" sign="−" />
+        {resumo.totalPago > 0 && (
+          <Row label="(-) Contas pagas" value={resumo.totalPago} color="var(--text-secondary)" sign="−" />
         )}
 
-        {totalGastos > 0 && (
-          <Row label="(-) Gastos variáveis" value={totalGastos} color="var(--text-secondary)" sign="−" />
+        {totalGastosVariaveis > 0 && (
+          <Row label="(-) Gastos variáveis" value={totalGastosVariaveis} color="var(--text-secondary)" sign="−" />
         )}
       </div>
 
       <div style={{ height: '0.5px', background: 'var(--divider)', margin: '0 20px' }} />
 
-      <div style={{ padding: '14px 20px 18px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+      <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
         <span style={{
           fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)',
           letterSpacing: '0.09em', textTransform: 'uppercase',
@@ -100,9 +103,40 @@ export function HomeResumoMes({ resumo, receita, totalGastos, onEditReceita }: P
             letterSpacing: '-0.05em', fontVariantNumeric: 'tabular-nums',
           }}
         >
-          {receita > 0 ? formatBRL(sobra) : '—'}
+          {formatBRL(sobra)}
         </motion.span>
       </div>
+
+      {resumo.totalPendente > 0 && (
+        <>
+          <div style={{ height: '0.5px', background: 'var(--divider)', margin: '0 20px' }} />
+          <div style={{ padding: '12px 20px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 11, color: 'var(--amber)', letterSpacing: '-0.01em' }}>
+                ⚠ Compromissos pendentes
+              </span>
+              <span style={{
+                fontSize: 12, fontWeight: 600, color: 'var(--amber)',
+                letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
+              }}>
+                −{formatBRL(resumo.totalPendente)}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 10, color: 'var(--text-tertiary)', letterSpacing: '-0.01em' }}>
+                Se pagar tudo
+              </span>
+              <span style={{
+                fontSize: 11, fontWeight: 600,
+                color: sobraSePageTudo >= 0 ? 'var(--text-tertiary)' : 'var(--red)',
+                letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums',
+              }}>
+                {formatBRL(sobraSePageTudo)}
+              </span>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

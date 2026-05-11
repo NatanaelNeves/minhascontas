@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Pencil, Trash2 } from 'lucide-react'
-import { CartaoComSaldo, Conta, FaturaCartao } from '@/types'
+import { CartaoComSaldo, Conta, FaturaCalculada } from '@/types'
 import { formatBRL } from '@/lib/utils'
 import { ConfirmDeleteModal } from '@/components/Modals/ConfirmDeleteModal'
 import { getLabelTipoCartao, recargaEmBreve } from '@/lib/cartoes'
@@ -9,7 +9,7 @@ import { getLabelTipoCartao, recargaEmBreve } from '@/lib/cartoes'
 interface Props {
   cartao: CartaoComSaldo
   contasDoCartao: Conta[]
-  fatura?: FaturaCartao
+  fatura?: FaturaCalculada
   onEdit: (c: CartaoComSaldo) => void
   onDelete: (id: string) => void
   onPagarFatura: (faturaId: string) => void
@@ -164,7 +164,7 @@ export function CartaoCard({ cartao, contasDoCartao, fatura, onEdit, onDelete, o
         {/* Linha 4: fatura aberta */}
         {fatura && !fatura.pago && (
           <button
-            onClick={e => { e.stopPropagation(); onPagarFatura(fatura.id) }}
+            onClick={e => { e.stopPropagation(); onPagarFatura(fatura.cartaoId) }}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '8px 12px', borderRadius: 8,

@@ -47,7 +47,7 @@ interface Props {
   editando: Transacao | null
   bancos: BancoComSaldo[]
   cartoes?: Cartao[]
-  onSave: (data: TransacaoInput) => void
+  onSave: (data: TransacaoInput, isRecorrente?: boolean) => void
   onClose: () => void
 }
 
@@ -65,6 +65,7 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
   const [customInput, setCustomInput] = useState('')
   const [data, setData] = useState(hoje)
   const [observacao, setObservacao] = useState('')
+  const [recorrente, setRecorrente] = useState(false)
 
   const creditCartoes = cartoes.filter(isCartaoCredito)
   const beneficioCartoes = cartoes.filter(isCartaoBeneficio)
@@ -112,6 +113,7 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
       setCustomInput('')
       setData(hoje)
       setObservacao('')
+      setRecorrente(false)
     }
   }, [editando, open])
 
@@ -154,7 +156,7 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
       tipo === 'gasto'
         ? { ...base, tipo: 'gasto', categoria: categoriaFinal }
         : { ...base, tipo: 'entrada' }
-    onSave(input)
+    onSave(input, recorrente && tipo === 'gasto' && !!cartaoId && !editando)
     onClose()
   }
 
@@ -531,6 +533,44 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
                   onBlur={blurInput}
                 />
               </div>
+
+              {/* Recorrente — apenas gasto no crédito, sem edição */}
+              {tipo === 'gasto' && !!cartaoId && !editando && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 14px', background: 'var(--bg-surface)',
+                  border: '1px solid var(--border)', borderRadius: 10,
+                }}>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                      Repete todo mês
+                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                      Lançado automaticamente no início de cada mês
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRecorrente(v => !v)}
+                    style={{
+                      width: 40, height: 22, borderRadius: 99,
+                      background: recorrente ? 'var(--green)' : 'rgba(255,255,255,0.1)',
+                      position: 'relative', cursor: 'pointer',
+                      border: 'none', padding: 0, flexShrink: 0, transition: 'background .2s',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                        position: 'absolute', top: 3,
+                        left: recorrente ? 20 : 3,
+                        transition: 'left .15s',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.35)',
+                      }}
+                    />
+                  </button>
+                </div>
+              )}
 
               {/* Observação */}
               <div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { CartaoComSaldo, CartaoInput, Conta, FaturaCartao, BancoComSaldo, Cartao } from '@/types'
+import { CartaoComSaldo, CartaoInput, Conta, FaturaCalculada, BancoComSaldo, Cartao, GastoRecorrente } from '@/types'
 import { formatBRL } from '@/lib/utils'
 import { useAppStore } from '@/store/useAppStore'
 import { CartaoCard } from './CartaoCard'
@@ -10,12 +10,14 @@ import { SelectBancoModal } from '@/components/Modals/SelectBancoModal'
 interface Props {
   cartoes: CartaoComSaldo[]
   contas: Conta[]
-  faturas: FaturaCartao[]
+  faturas: FaturaCalculada[]
   bancos: BancoComSaldo[]
+  gastosRecorrentes: GastoRecorrente[]
   onAdd: (data: CartaoInput) => void
   onUpdate: (id: string, data: Partial<CartaoInput>) => void
   onDelete: (id: string) => void
-  onMarcarFaturaPaga: (faturaId: string, bancoId: string) => void
+  onMarcarFaturaPaga: (faturaId: string, bancoId: string, dataPagamento: string) => void
+  onCancelarRecorrente: (id: string) => Promise<void>
   onNavigateToBancos: () => void
 }
 
@@ -24,10 +26,12 @@ export function CartoesList({
   contas,
   faturas,
   bancos,
+  gastosRecorrentes,
   onAdd,
   onUpdate,
   onDelete,
   onMarcarFaturaPaga,
+  onCancelarRecorrente,
   onNavigateToBancos,
 }: Props) {
   const { mesAtivo } = useAppStore()
@@ -48,8 +52,8 @@ export function CartoesList({
     setEditando(null)
   }
 
-  function handleBancoSelect(bancoId: string) {
-    if (pagarFaturaId) onMarcarFaturaPaga(pagarFaturaId, bancoId)
+  function handleBancoSelect(bancoId: string, dataPagamento: string) {
+    if (pagarFaturaId) onMarcarFaturaPaga(pagarFaturaId, bancoId, dataPagamento)
     setPagarFaturaId(null)
   }
 
@@ -129,8 +133,14 @@ export function CartoesList({
         open={detailCartao !== null}
         cartao={detailCartao}
         contas={detailCartao ? contas.filter(c => c.cartaoId === detailCartao.id) : []}
+        fatura={detailCartao ? (faturas.find(f => f.cartaoId === detailCartao.id) ?? null) : null}
+        gastosRecorrentes={detailCartao ? gastosRecorrentes.filter(r => r.cartaoId === detailCartao.id && r.ativo) : []}
         mesAtivo={mesAtivo}
         onClose={() => setDetailCartao(null)}
+        onPagarFatura={() => {
+          if (detailCartao) { setPagarFaturaId(detailCartao.id); setDetailCartao(null) }
+        }}
+        onCancelarRecorrente={onCancelarRecorrente}
       />
     </div>
   )

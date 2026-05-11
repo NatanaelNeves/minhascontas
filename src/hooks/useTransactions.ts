@@ -38,6 +38,7 @@ function docToTransacao(snap: QueryDocumentSnapshot<DocumentData>): Transacao {
 export interface UseTransactionsReturn {
   transacoes: Transacao[]
   totalGastos: number
+  totalGastosVariaveis: number
   totalEntradas: number
   gastosPorCategoria: Record<string, number>
   gastosPorDia: { data: string; total: number }[]
@@ -66,6 +67,13 @@ export function useTransactions(userId: string, mesId: string): UseTransactionsR
 
   const totalGastos = useMemo(
     () => transacoes.filter(t => t.tipo === 'gasto').reduce((s, t) => s + t.valor, 0),
+    [transacoes],
+  )
+
+  const totalGastosVariaveis = useMemo(
+    () => transacoes
+      .filter(t => t.tipo === 'gasto' && t.origem?.tipo !== 'pagamento_fatura')
+      .reduce((s, t) => s + t.valor, 0),
     [transacoes],
   )
 
@@ -111,6 +119,7 @@ export function useTransactions(userId: string, mesId: string): UseTransactionsR
   return {
     transacoes,
     totalGastos,
+    totalGastosVariaveis,
     totalEntradas,
     gastosPorCategoria,
     gastosPorDia,

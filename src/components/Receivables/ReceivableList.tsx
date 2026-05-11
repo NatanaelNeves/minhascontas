@@ -11,7 +11,7 @@ interface Props {
   onAdd: (data: AReceberInput) => void
   onUpdate: (id: string, data: Partial<AReceberInput>) => void
   onDelete: (id: string) => void
-  onMarcarRecebido: (id: string, bancoId: string) => void
+  onMarcarRecebido: (id: string, bancoId: string, data: string) => void
   onDesmarcarRecebido: (id: string) => void
   onNavigateToBancos: () => void
 }
@@ -46,8 +46,8 @@ export function ReceivableList({
     }
   }
 
-  function handleBancoSelect(bancoId: string) {
-    if (selectBancoId) onMarcarRecebido(selectBancoId, bancoId)
+  function handleBancoSelect(bancoId: string, data: string) {
+    if (selectBancoId) onMarcarRecebido(selectBancoId, bancoId, data)
     setSelectBancoId(null)
   }
 

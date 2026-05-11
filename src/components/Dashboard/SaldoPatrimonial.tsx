@@ -31,6 +31,15 @@ export function SaldoPatrimonial({ bancos, cartoesComSaldo, onNavigateToBancos }
   const temBeneficios = beneficioAlim > 0 || beneficioComb > 0
   const semBancos = corrente.length === 0
 
+  const cartoesCredito = useMemo(() =>
+    cartoesComSaldo.filter(c => c.tipo === 'credito'),
+    [cartoesComSaldo],
+  )
+  const totalCreditoDisponivel = useMemo(() =>
+    cartoesCredito.reduce((s, c) => s + c.limiteDisponivel, 0),
+    [cartoesCredito],
+  )
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Bloco A: Dinheiro disponível */}
@@ -114,18 +123,23 @@ export function SaldoPatrimonial({ bancos, cartoesComSaldo, onNavigateToBancos }
           transition={{ duration: 0.3, delay: 0.05 }}
           style={{
             background: 'var(--bg-surface)',
-            border: '1px solid var(--border)',
+            border: '1px solid rgba(245,158,11,0.2)',
             borderRadius: 'var(--radius-lg)',
-            padding: '14px 20px',
+            overflow: 'hidden',
           }}
         >
-          <p style={{
-            fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)',
-            letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10,
-          }}>
-            Benefícios
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px' }}>
+            <p style={{
+              fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)',
+              letterSpacing: '0.12em', textTransform: 'uppercase',
+            }}>
+              Benefícios
+            </p>
+            <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--amber)', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>
+              {formatBRL(beneficioAlim + beneficioComb)}
+            </span>
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', padding: '10px 20px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
             {beneficioAlim > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>🍽️ Alimentação/Refeição</span>
@@ -146,7 +160,49 @@ export function SaldoPatrimonial({ bancos, cartoesComSaldo, onNavigateToBancos }
         </motion.div>
       )}
 
-      {/* Bloco C: Investimentos */}
+      {/* Bloco C: Crédito disponível */}
+      {cartoesCredito.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.08 }}
+          style={{
+            background: 'var(--bg-surface)',
+            border: '1px solid rgba(96,165,250,0.2)',
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px' }}>
+            <p style={{
+              fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)',
+              letterSpacing: '0.12em', textTransform: 'uppercase',
+            }}>
+              Crédito disponível
+            </p>
+            <span style={{ fontSize: 18, fontWeight: 600, color: '#60a5fa', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>
+              {formatBRL(totalCreditoDisponivel)}
+            </span>
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', padding: '10px 20px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {cartoesCredito.map(c => {
+              const baixo = c.limite > 0 && c.limiteDisponivel / c.limite < 0.2
+              return (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    💳 {c.nome}
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 500, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', color: baixo ? 'var(--red)' : 'var(--text-secondary)' }}>
+                    {formatBRL(c.limiteDisponivel)} de {formatBRL(c.limite)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Bloco D: Investimentos */}
       {investimento.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}

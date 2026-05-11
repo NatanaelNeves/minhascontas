@@ -24,6 +24,7 @@ interface UseMonthReturn {
   criarMes: (mesId: string, receita: number) => Promise<void>
   copiarFixos: (mesOrigemId: string, mesDestinoId: string) => Promise<void>
   mesExiste: (mesId: string) => Promise<boolean>
+  propagarSaldosBancos: (mesAnteriorId: string) => Promise<void>
   criarContaComParcelas: (
     conta: ContaInput,
     parcelaTotal: number,
@@ -72,13 +73,25 @@ export function useMonth(userId: string): UseMonthReturn {
 
   async function criarMes(mesId: string, receita: number) {
     const infoRef = doc(db, `users/${userId}/months/${mesId}`)
-    await setDoc(infoRef, { receita, criadoEm: serverTimestamp() })
+    await setDoc(infoRef, { receita, criadoEm: serverTimestamp(), mesInicializado: true })
   }
 
   async function mesExiste(mesId: string): Promise<boolean> {
     const infoRef = doc(db, `users/${userId}/months/${mesId}`)
     const snap = await getDoc(infoRef)
     return snap.exists()
+  }
+
+  function atualizarDataParaMes(dataOriginal: string | null, novoMesId: string): string | null {
+    if (!dataOriginal) return null
+    const [, , diaStr] = dataOriginal.split('-')
+    const dia = Number(diaStr)
+    const [anoStr, mesStr] = novoMesId.split('-')
+    const ano = Number(anoStr)
+    const mes = Number(mesStr)
+    const ultimoDia = new Date(ano, mes, 0).getDate()
+    const diaFinal = Math.min(dia, ultimoDia)
+    return `${anoStr}-${mesStr}-${String(diaFinal).padStart(2, '0')}`
   }
 
   async function copiarFixos(mesOrigemId: string, mesDestinoId: string) {
@@ -103,13 +116,42 @@ export function useMonth(userId: string): UseMonthReturn {
         valor: data.valor,
         categoria: data.categoria,
         formaPagamento: data.formaPagamento,
-        vencimento: data.vencimento ?? null,
+        vencimento: atualizarDataParaMes(data.vencimento ?? null, mesDestinoId),
         parcelas: novaParcelas,
         pago: false,
         ...(data.recorrente ? { recorrente: true } : {}),
         criadoEm: serverTimestamp(),
       })
     }
+  }
+
+  async function propagarSaldosBancos(mesAnteriorId: string): Promise<void> {
+    const [txsSnap, bancosSnap] = await Promise.all([
+      getDocs(collection(db, `users/${userId}/months/${mesAnteriorId}/transactions`)),
+      getDocs(collection(db, `users/${userId}/banks`)),
+    ])
+
+    const txs = txsSnap.docs.map(d => d.data())
+    const batch = writeBatch(db)
+
+    bancosSnap.docs.forEach(bancoDoc => {
+      const banco = bancoDoc.data()
+      if ((banco.tipo as string) === 'investimento') return
+
+      const gastos = txs
+        .filter(t => t.bancoId === bancoDoc.id && (t.tipo as string) === 'gasto' && !t.cartaoId)
+        .reduce((sum, t) => sum + (t.valor as number), 0)
+
+      const entradas = txs
+        .filter(t => t.bancoId === bancoDoc.id && (t.tipo as string) === 'entrada')
+        .reduce((sum, t) => sum + (t.valor as number), 0)
+
+      batch.update(doc(db, `users/${userId}/banks/${bancoDoc.id}`), {
+        saldoInicial: (banco.saldoInicial as number) + entradas - gastos,
+      })
+    })
+
+    await batch.commit()
   }
 
   async function criarContaComParcelas(
@@ -163,5 +205,5 @@ export function useMonth(userId: string): UseMonthReturn {
     }
   }
 
-  return { mesInfo, isLoading, setReceita, criarMes, copiarFixos, mesExiste, criarContaComParcelas, excluirParcelamentosRestantes }
+  return { mesInfo, isLoading, setReceita, criarMes, copiarFixos, mesExiste, propagarSaldosBancos, criarContaComParcelas, excluirParcelamentosRestantes }
 }

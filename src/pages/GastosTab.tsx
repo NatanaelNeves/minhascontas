@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Search } from 'lucide-react'
-import { Transacao, TransacaoInput, BancoComSaldo, Cartao } from '@/types'
+import { Transacao, TransacaoInput, BancoComSaldo, Cartao, GastoRecorrenteInput } from '@/types'
 import { TransactionList } from '@/components/Transactions/TransactionList'
 import { TransactionModal } from '@/components/Transactions/TransactionModal'
 import { isCartaoCredito } from '@/lib/cartoes'
@@ -13,9 +13,11 @@ interface Props {
   onUpdate: (id: string, data: Partial<TransacaoInput>) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onUpdateCartao: (id: string, data: Partial<Cartao>) => Promise<void>
+  onAddRecorrente: (input: GastoRecorrenteInput) => Promise<string>
+  onCancelarRecorrente: (id: string) => Promise<void>
 }
 
-export function GastosTab({ transacoes, bancos, cartoes, onAdd, onUpdate, onDelete, onUpdateCartao }: Props) {
+export function GastosTab({ transacoes, bancos, cartoes, onAdd, onUpdate, onDelete, onUpdateCartao, onAddRecorrente, onCancelarRecorrente }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editando, setEditando] = useState<Transacao | null>(null)
   const [busca, setBusca] = useState('')
@@ -41,7 +43,7 @@ export function GastosTab({ transacoes, bancos, cartoes, onAdd, onUpdate, onDele
     await onUpdateCartao(cartaoId, { saldoAtual: Math.max(0, cartao.saldoAtual + delta) })
   }
 
-  async function handleSave(data: TransacaoInput) {
+  async function handleSave(data: TransacaoInput, isRecorrente?: boolean) {
     const anterior = editando ? transacoesPorId.get(editando.id) ?? editando : null
     const cartaoAnterior = anterior ? getCartaoBeneficio(anterior.cartaoId) : null
     const cartaoNovo = getCartaoBeneficio(data.cartaoId)
@@ -54,7 +56,17 @@ export function GastosTab({ transacoes, bancos, cartoes, onAdd, onUpdate, onDele
       await ajustarSaldoCartao(cartaoNovo.id, -data.valor)
     }
 
-    if (editando) {
+    if (isRecorrente && !editando && data.tipo === 'gasto' && data.cartaoId) {
+      const gastoData = data as { tipo: 'gasto'; categoria: string; cartaoId: string; descricao: string; valor: number }
+      const recorrenteId = await onAddRecorrente({
+        cartaoId: gastoData.cartaoId,
+        descricao: gastoData.descricao,
+        valor: gastoData.valor,
+        categoria: gastoData.categoria,
+        ativo: true,
+      })
+      await onAdd({ ...data, recorrenteId })
+    } else if (editando) {
       await onUpdate(editando.id, data)
     } else {
       await onAdd(data)
@@ -119,6 +131,7 @@ export function GastosTab({ transacoes, bancos, cartoes, onAdd, onUpdate, onDele
           setModalOpen(true)
         }}
         onDelete={handleDelete}
+        onCancelarRecorrente={onCancelarRecorrente}
       />
       <TransactionModal
         open={modalOpen}

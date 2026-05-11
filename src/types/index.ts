@@ -87,8 +87,8 @@ export const CATEGORIAS_FIXAS = [
 ] as const
 
 export interface TransacaoOrigem {
-  tipo: 'bill' | 'receivable'
-  id: string
+  tipo: 'bill' | 'receivable' | 'pagamento_fatura'
+  id?: string
 }
 
 type TransacaoBase = {
@@ -102,6 +102,7 @@ type TransacaoBase = {
   cartaoId?: string
   formaPagamento?: FormaPagamentoTransacao
   origem?: TransacaoOrigem
+  recorrenteId?: string
   criadoEm: Date
 }
 
@@ -183,6 +184,18 @@ export type CartaoComSaldo =
       recargaEmBreve: boolean
     })
 
+export interface GastoRecorrente {
+  id: string
+  cartaoId: string
+  descricao: string
+  valor: number
+  categoria: string
+  ativo: boolean
+  criadoEm: Date
+}
+
+export type GastoRecorrenteInput = Omit<GastoRecorrente, 'id' | 'criadoEm'>
+
 export interface FaturaCartao {
   id: string
   cartaoId: string
@@ -191,4 +204,20 @@ export interface FaturaCartao {
   total: number
   pago: boolean
   criadoEm: Date
+}
+
+export interface FaturaCalculada {
+  cartaoId: string
+  cartaoNome: string
+  cartaoCor: string
+  diaVencimento: number
+  totalAvulso: number
+  totalParcelas: number
+  total: number
+  gastosAvulsos: Transacao[]
+  contasParceladas: Conta[]
+  pago: boolean
+  dataPagamento: string | null
+  bancoId?: string
+  transacaoId?: string
 }

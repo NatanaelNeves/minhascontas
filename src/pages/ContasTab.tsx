@@ -1,15 +1,18 @@
 import { useState, useEffect, useMemo } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ChevronDown } from 'lucide-react'
 import { BillList } from '@/components/BillList/BillList'
 import { BillModal } from '@/components/Modals/BillModal'
 import { PagarContaModal } from '@/components/Modals/PagarContaModal'
 import { SelectBancoModal } from '@/components/Modals/SelectBancoModal'
-import { Conta, ContaInput, BancoComSaldo, FaturaCartao, Cartao } from '@/types'
+import { ConfirmDeleteModal } from '@/components/Modals/ConfirmDeleteModal'
+import { Conta, ContaInput, BancoComSaldo, FaturaCalculada, Cartao } from '@/types'
 import { formatBRL } from '@/lib/utils'
 
 interface Props {
   contas: Conta[]
   bancos: BancoComSaldo[]
-  faturas: FaturaCartao[]
+  faturas: FaturaCalculada[]
   cartoes: Cartao[]
   onTogglePago: (id: string, pago: boolean) => Promise<void>
   onTogglePagoComBanco: (
@@ -26,8 +29,8 @@ interface Props {
   onDeleteParcelamento?: (parcelamentoId: string, parcelaAtualFrom: number, parcelaTotal: number) => Promise<void>
   onNavigateToBancos: () => void
   onNavigateToCartoes: () => void
-  onMarcarFaturaPaga: (faturaId: string, bancoId: string) => Promise<void>
-  onDesmarcarFaturaPaga: (faturaId: string) => Promise<void>
+  onMarcarFaturaPaga: (cartaoId: string, bancoId: string, dataPagamento: string) => Promise<void>
+  onDesmarcarFaturaPaga: (cartaoId: string) => Promise<void>
 }
 
 export function ContasTab({
@@ -51,7 +54,9 @@ export function ContasTab({
   const [billModalOpen, setBillModalOpen] = useState(false)
   const [editando, setEditando] = useState<Conta | null>(null)
   const [pendingToggleId, setPendingToggleId] = useState<string | null>(null)
-  const [pendingFaturaId, setPendingFaturaId] = useState<string | null>(null)
+  const [pendingFaturaCartaoId, setPendingFaturaCartaoId] = useState<string | null>(null)
+  const [confirmDesmarcarId, setConfirmDesmarcarId] = useState<string | null>(null)
+  const [expandedFaturaId, setExpandedFaturaId] = useState<string | null>(null)
 
   useEffect(() => {
     function openAdd() { setEditando(null); setBillModalOpen(true) }
@@ -63,15 +68,12 @@ export function ContasTab({
 
   function handleToggle(id: string, pago: boolean) {
     if (pago) {
-      // Currently paid → undo
       onDesfazerPagamento(id)
     } else {
-      // Currently unpaid → pay
       const conta = contas.find(c => c.id === id)
       if (conta?.cartaoId) {
         const cartao = cartoes.find(c => c.id === conta.cartaoId)
         if (cartao && cartao.tipo !== 'credito') {
-          // Benefit card → mark paid directly, no bank deduction
           onTogglePago(id, true)
           return
         }
@@ -90,10 +92,10 @@ export function ContasTab({
     setPendingToggleId(null)
   }
 
-  function handleFaturaBancoSelect(bancoId: string) {
-    if (!pendingFaturaId) return
-    onMarcarFaturaPaga(pendingFaturaId, bancoId)
-    setPendingFaturaId(null)
+  function handleFaturaBancoSelect(bancoId: string, dataPagamento: string) {
+    if (!pendingFaturaCartaoId) return
+    onMarcarFaturaPaga(pendingFaturaCartaoId, bancoId, dataPagamento)
+    setPendingFaturaCartaoId(null)
   }
 
   function handleSave(data: ContaInput) {
@@ -149,62 +151,159 @@ export function ContasTab({
         </div>
       )}
 
-      {/* Faturas de cartão */}
+      {/* Faturas do mês */}
       {faturas.length > 0 && (
         <div>
           <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 10 }}>
-            Faturas de cartão
+            Faturas do mês
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {faturas.map(fatura => {
-              const cartao = cartoes.find(c => c.id === fatura.cartaoId)
-              if (!cartao) return null
+              const expanded = expandedFaturaId === fatura.cartaoId
+              const isPago = fatura.pago
+              const nItens = fatura.gastosAvulsos.length + fatura.contasParceladas.length
+              const textColor = isPago ? 'var(--text-disabled)' : 'var(--text-primary)'
+              const subColor = isPago ? 'var(--text-disabled)' : 'var(--text-tertiary)'
+
               return (
                 <div
-                  key={fatura.id}
+                  key={fatura.cartaoId}
                   style={{
-                    background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-md)', padding: '12px 14px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-                    borderLeft: `3px solid ${cartao.cor}`,
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border)',
+                    borderLeft: `3px solid ${fatura.cartaoCor}`,
+                    borderRadius: 'var(--radius-lg)',
+                    overflow: 'hidden',
                   }}
                 >
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em', marginBottom: 2 }}>
-                      {cartao.nome}
-                    </p>
-                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                      Fatura · vence dia {cartao.diaVencimento}
-                    </p>
+                  {/* Header row */}
+                  <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {/* Chevron */}
+                    <button
+                      onClick={() => setExpandedFaturaId(expanded ? null : fatura.cartaoId)}
+                      style={{
+                        width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)',
+                        flexShrink: 0, transition: 'transform .2s',
+                        transform: expanded ? 'rotate(180deg)' : 'none',
+                      }}
+                    >
+                      <ChevronDown size={14} />
+                    </button>
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 14, fontWeight: 500, color: textColor, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {fatura.cartaoNome}
+                      </p>
+                      <p style={{ fontSize: 11, color: subColor, marginTop: 2 }}>
+                        {isPago
+                          ? `Pago em ${fatura.dataPagamento ? new Date(fatura.dataPagamento + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}`
+                          : `Vence dia ${fatura.diaVencimento} · ${nItens} ${nItens === 1 ? 'item' : 'itens'}`
+                        }
+                      </p>
+                    </div>
+
+                    {/* Total + action */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: textColor, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+                        {formatBRL(fatura.total)}
+                      </span>
+                      {isPago ? (
+                        <button
+                          onClick={() => setConfirmDesmarcarId(fatura.cartaoId)}
+                          style={{
+                            padding: '5px 11px', borderRadius: 99, fontSize: 11, fontWeight: 600,
+                            background: 'var(--green-muted)', color: 'var(--green)',
+                            border: '1px solid rgba(52,199,123,0.25)', cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >
+                          ✓ Paga
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setPendingFaturaCartaoId(fatura.cartaoId)}
+                          style={{
+                            padding: '5px 11px', borderRadius: 99, fontSize: 11, fontWeight: 600,
+                            background: 'var(--amber-muted)', color: 'var(--amber)',
+                            border: '1px solid rgba(245,158,11,0.25)', cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >
+                          Pagar
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
-                      {formatBRL(fatura.total)}
-                    </span>
-                    {fatura.pago ? (
-                      <button
-                        onClick={() => onDesmarcarFaturaPaga(fatura.id)}
-                        style={{
-                          padding: '6px 12px', borderRadius: 99, fontSize: 11, fontWeight: 600,
-                          background: 'var(--green-muted)', color: 'var(--green)',
-                          border: '1px solid rgba(52,199,123,0.25)', cursor: 'pointer', fontFamily: 'inherit',
-                        }}
+
+                  {/* Expanded detail */}
+                  <AnimatePresence initial={false}>
+                    {expanded && (
+                      <motion.div
+                        initial={{ height: 0 }}
+                        animate={{ height: 'auto' }}
+                        exit={{ height: 0 }}
+                        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                        style={{ overflow: 'hidden' }}
                       >
-                        ✓ Paga
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setPendingFaturaId(fatura.id)}
-                        style={{
-                          padding: '6px 12px', borderRadius: 99, fontSize: 11, fontWeight: 600,
-                          background: 'var(--amber-muted)', color: 'var(--amber)',
-                          border: '1px solid rgba(245,158,11,0.25)', cursor: 'pointer', fontFamily: 'inherit',
-                        }}
-                      >
-                        Pagar
-                      </button>
+                        <div style={{ borderTop: '0.5px solid var(--divider)', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {/* Gastos avulsos */}
+                          {fatura.gastosAvulsos.length > 0 && (
+                            <div>
+                              <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
+                                Gastos avulsos
+                              </p>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                {fatura.gastosAvulsos.map(t => (
+                                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {t.descricao}
+                                    </span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                                      <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                                        {new Date(t.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                      </span>
+                                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                                        {formatBRL(t.valor)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Parcelas */}
+                          {fatura.contasParceladas.length > 0 && (
+                            <div>
+                              <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
+                                Parcelas
+                              </p>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                {fatura.contasParceladas.map(c => (
+                                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {c.nome}{c.parcelas ? ` ${c.parcelas.atual}/${c.parcelas.total}` : ''}
+                                    </span>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                                      {formatBRL(c.valor)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Total line */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '0.5px solid var(--divider)', paddingTop: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Total</span>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+                              {formatBRL(fatura.total)}
+                            </span>
+                          </div>
+                        </div>
+                      </motion.div>
                     )}
-                  </div>
+                  </AnimatePresence>
                 </div>
               )
             })}
@@ -242,11 +341,21 @@ export function ContasTab({
       />
 
       <SelectBancoModal
-        open={pendingFaturaId !== null}
+        open={pendingFaturaCartaoId !== null}
         bancos={bancos}
         onSelect={handleFaturaBancoSelect}
-        onClose={() => setPendingFaturaId(null)}
+        onClose={() => setPendingFaturaCartaoId(null)}
         onNavigateToBancos={onNavigateToBancos}
+      />
+
+      <ConfirmDeleteModal
+        open={confirmDesmarcarId !== null}
+        titulo="Reverter pagamento?"
+        descricao="A transação bancária será removida e as parcelas voltarão como não pagas."
+        onConfirm={() => {
+          if (confirmDesmarcarId) onDesmarcarFaturaPaga(confirmDesmarcarId)
+        }}
+        onClose={() => setConfirmDesmarcarId(null)}
       />
     </div>
   )

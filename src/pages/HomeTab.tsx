@@ -18,7 +18,7 @@ interface Props {
   contas: Conta[]
   bancos: BancoComSaldo[]
   cartoesComSaldo: CartaoComSaldo[]
-  totalGastos: number
+  totalGastosVariaveis: number
   totalPendente: number
   nRecebiveis: number
   gastosPorCategoria: Record<string, number>
@@ -35,7 +35,7 @@ export function HomeTab({
   contas,
   bancos,
   cartoesComSaldo,
-  totalGastos,
+  totalGastosVariaveis,
   totalPendente,
   nRecebiveis,
   gastosPorCategoria,
@@ -65,7 +65,7 @@ export function HomeTab({
       <HomeResumoMes
         resumo={resumo}
         receita={receita}
-        totalGastos={totalGastos}
+        totalGastosVariaveis={totalGastosVariaveis}
         onEditReceita={onEditReceita}
       />
 

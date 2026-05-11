@@ -7,7 +7,7 @@ interface Props {
   onAdd: (data: AReceberInput) => Promise<void>
   onUpdate: (id: string, data: Partial<AReceberInput>) => Promise<void>
   onDelete: (id: string) => Promise<void>
-  onMarcarRecebido: (id: string, bancoId: string) => Promise<void>
+  onMarcarRecebido: (id: string, bancoId: string, data: string) => Promise<void>
   onDesmarcarRecebido: (id: string) => Promise<void>
   onNavigateToBancos: () => void
 }

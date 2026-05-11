@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { CartaoComSaldo, Conta } from '@/types'
+import { CartaoComSaldo, Conta, FaturaCalculada, GastoRecorrente } from '@/types'
 import { formatBRL, mesIdAddMeses, mesIdToShortLabel } from '@/lib/utils'
+import { ConfirmDeleteModal } from '@/components/Modals/ConfirmDeleteModal'
 
 const TIPO_LABEL: Record<string, string> = {
   credito: 'Crédito',
@@ -17,8 +18,12 @@ interface Props {
   open: boolean
   cartao: CartaoComSaldo | null
   contas: Conta[]
+  fatura: FaturaCalculada | null
+  gastosRecorrentes: GastoRecorrente[]
   mesAtivo: string
   onClose: () => void
+  onPagarFatura: () => void
+  onCancelarRecorrente: (id: string) => Promise<void>
 }
 
 function parcelaCor(mr: number) {
@@ -37,7 +42,8 @@ function parcelaCorBorder(mr: number) {
   return 'rgba(239,68,68,0.25)'
 }
 
-export function CartaoDetailSheet({ open, cartao, contas, mesAtivo, onClose }: Props) {
+export function CartaoDetailSheet({ open, cartao, contas, fatura, gastosRecorrentes, mesAtivo, onClose, onPagarFatura, onCancelarRecorrente }: Props) {
+  const [cancelarRecorrenteId, setCancelarRecorrenteId] = useState<string | null>(null)
   const parcelamentos = useMemo(() => {
     const seen = new Set<string>()
     return contas.filter(c => {
@@ -57,7 +63,7 @@ export function CartaoDetailSheet({ open, cartao, contas, mesAtivo, onClose }: P
   const pct = cartao ? Math.min(cartao.percentualUsado, 100) : 0
   const barColor = pct >= 90 ? 'var(--red)' : pct >= 70 ? 'var(--amber)' : 'var(--green)'
 
-  return createPortal(
+  const sheet = createPortal(
     <AnimatePresence>
       {open && cartao && (
         <>
@@ -229,8 +235,55 @@ export function CartaoDetailSheet({ open, cartao, contas, mesAtivo, onClose }: P
                 </div>
               )}
 
+              {/* Recorrentes ativos */}
+              {gastosRecorrentes.length > 0 && (
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 10 }}>
+                    Recorrentes ativos
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {gastosRecorrentes.map(r => (
+                      <div key={r.id} style={{
+                        padding: '10px 14px',
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                      }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {r.descricao}
+                          </p>
+                          <p style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 1 }}>
+                            Todo mês · {r.categoria}
+                          </p>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+                            {formatBRL(r.valor)}/mês
+                          </span>
+                          <button
+                            onClick={() => setCancelarRecorrenteId(r.id)}
+                            style={{
+                              fontSize: 10, color: 'var(--text-tertiary)', background: 'none',
+                              border: '1px solid var(--border)', borderRadius: 6,
+                              padding: '3px 8px', cursor: 'pointer', fontFamily: 'inherit',
+                              transition: 'color .15s, border-color .15s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.color = 'var(--red)'; e.currentTarget.style.borderColor = 'var(--red)' }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-tertiary)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Empty state */}
-              {parcelamentos.length === 0 && avulsos.length === 0 && (
+              {parcelamentos.length === 0 && avulsos.length === 0 && gastosRecorrentes.length === 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 0', gap: 8 }}>
                   <span style={{ fontSize: 32 }}>💳</span>
                   <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Nenhum gasto neste mês</p>
@@ -239,43 +292,69 @@ export function CartaoDetailSheet({ open, cartao, contas, mesAtivo, onClose }: P
             </div>
 
             {/* Footer: fatura resumo */}
-            {(parcelamentos.length > 0 || avulsos.length > 0) && (
+            {(parcelamentos.length > 0 || avulsos.length > 0 || (fatura && fatura.total > 0)) && (
               <div style={{ borderTop: '0.5px solid var(--border)', padding: '16px 22px', flexShrink: 0 }}>
                 <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 10 }}>
                   Resumo da fatura
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {parcelamentos.length > 0 && (
+                  {(fatura ? fatura.totalAvulso > 0 : avulsos.length > 0) && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                        Parcelamentos ({parcelamentos.length})
+                        Gastos avulsos ({fatura ? fatura.gastosAvulsos.length : avulsos.length})
                       </span>
                       <span style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
-                        {formatBRL(totalParcelamentos)}
+                        {formatBRL(fatura ? fatura.totalAvulso : totalAvulsos)}
                       </span>
                     </div>
                   )}
-                  {avulsos.length > 0 && (
+                  {(fatura ? fatura.totalParcelas > 0 : parcelamentos.length > 0) && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                        Avulsos ({avulsos.length})
+                        Parcelas do mês ({fatura ? fatura.contasParceladas.length : parcelamentos.length})
                       </span>
                       <span style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
-                        {formatBRL(totalAvulsos)}
+                        {formatBRL(fatura ? fatura.totalParcelas : totalParcelamentos)}
                       </span>
                     </div>
                   )}
                   <div style={{ height: 1, background: 'var(--border)', margin: '3px 0' }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Total</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Total da fatura</span>
                     <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
-                      {formatBRL(totalFatura)}
+                      {formatBRL(fatura ? fatura.total : totalFatura)}
                     </span>
                   </div>
                   {cartao.tipo === 'credito' && (
                     <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
                       Fecha dia {cartao.diaFechamento} · Vence dia {cartao.diaVencimento}
                     </p>
+                  )}
+                  {fatura && !fatura.pago && fatura.total > 0 && (
+                    <button
+                      onClick={onPagarFatura}
+                      style={{
+                        marginTop: 8, padding: '11px', borderRadius: 10,
+                        background: 'var(--text-primary)', border: 'none',
+                        color: 'var(--bg-base)', fontSize: 13, fontWeight: 600,
+                        fontFamily: 'inherit', cursor: 'pointer', letterSpacing: '-0.01em',
+                        transition: 'opacity .15s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                      onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                    >
+                      Pagar fatura →
+                    </button>
+                  )}
+                  {fatura?.pago && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
+                      <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 500 }}>
+                        Pago em {fatura.dataPagamento
+                          ? new Date(fatura.dataPagamento + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                          : '—'}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -285,5 +364,21 @@ export function CartaoDetailSheet({ open, cartao, contas, mesAtivo, onClose }: P
       )}
     </AnimatePresence>,
     document.body
+  )
+
+  return (
+    <>
+      {sheet}
+      <ConfirmDeleteModal
+        open={cancelarRecorrenteId !== null}
+        titulo="Cancelar recorrência?"
+        descricao="O lançamento deste mês permanece. Nos próximos meses ele não será criado automaticamente."
+        onConfirm={() => {
+          if (cancelarRecorrenteId) onCancelarRecorrente(cancelarRecorrenteId)
+          setCancelarRecorrenteId(null)
+        }}
+        onClose={() => setCancelarRecorrenteId(null)}
+      />
+    </>
   )
 }

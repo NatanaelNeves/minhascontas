@@ -9,6 +9,7 @@ interface Props {
   cartoes?: Cartao[]
   onEdit: (t: Transacao) => void
   onDelete: (id: string) => void
+  onCancelarRecorrente?: (recorrenteId: string) => void
 }
 
 function formatGroupDate(dateStr: string): string {
@@ -20,7 +21,7 @@ function formatGroupDate(dateStr: string): string {
   return `${d}/${m}`
 }
 
-export function TransactionList({ transacoes, bancos, cartoes = [], onEdit, onDelete }: Props) {
+export function TransactionList({ transacoes, bancos, cartoes = [], onEdit, onDelete, onCancelarRecorrente }: Props) {
   const grupos = useMemo(() => {
     const map = new Map<string, Transacao[]>()
     transacoes.forEach(t => {
@@ -83,6 +84,7 @@ export function TransactionList({ transacoes, bancos, cartoes = [], onEdit, onDe
                     cartoes={cartoes}
                     onEdit={onEdit}
                     onDelete={onDelete}
+                    onCancelarRecorrente={onCancelarRecorrente}
                   />
                 </div>
               ))}
