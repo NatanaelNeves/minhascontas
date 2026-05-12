@@ -12,7 +12,6 @@ import { useAppStore } from '@/store/useAppStore'
 import { Header } from '@/components/ui/Header'
 import { BottomNav } from '@/components/BottomNav/BottomNav'
 import { ReceitaModal } from '@/components/Modals/ReceitaModal'
-import { CopiarFixosModal } from '@/components/Modals/CopiarFixosModal'
 import { HomeTab } from './HomeTab'
 import { ContasTab } from './ContasTab'
 import { GastosTab } from './GastosTab'
@@ -33,7 +32,7 @@ export function Dashboard({ userId }: { userId: string }) {
     isLoading: isMonthLoading,
     setReceita,
     criarMes,
-    copiarFixos,
+    copiarContasRecorrentes,
     mesExiste,
     propagarSaldosBancos,
     propagarFaturasNaoPagas,
@@ -64,6 +63,7 @@ export function Dashboard({ userId }: { userId: string }) {
   const { bancos, addBanco, updateBanco, deleteBanco } = useBanks(
     userId,
     transacoes,
+    mesInfo?.saldosIniciais,
   )
 
   const {
@@ -78,7 +78,7 @@ export function Dashboard({ userId }: { userId: string }) {
 
   const { cartoes, addCartao, updateCartao, deleteCartao } = useCartoes(userId)
   const { faturas, marcarFaturaPaga, desmarcarFaturaPaga } = useFaturas(userId, mesAtivo, cartoes, transacoes, contas)
-  const { gastosRecorrentes, addRecorrente, cancelarRecorrente, criarTransacoesParaMes } = useGastosRecorrentes(userId)
+  const { addRecorrente, cancelarRecorrente, criarTransacoesParaMes, gastosRecorrentes } = useGastosRecorrentes(userId)
 
   const cartoesComSaldo = useMemo<CartaoComSaldo[]>(() => {
     return cartoes.map(cartao => {
@@ -111,24 +111,42 @@ export function Dashboard({ userId }: { userId: string }) {
   }, [cartoes, transacoes, contas])
 
   const [receitaModalOpen, setReceitaModalOpen] = useState(false)
-  const [copiarModalOpen, setCopiarModalOpen] = useState(false)
-  const [mesOrigemId, setMesOrigemId] = useState('')
+  const [inicializando, setInicializando] = useState(false)
   const inicializadoRef = useRef<Set<string>>(new Set())
+  const prevMesAtivoRef = useRef(mesAtivo)
+
+  async function inicializarMesSeNecessario(novoMesId: string, mesAnteriorId: string) {
+    const jaExiste = await mesExiste(novoMesId)
+    if (jaExiste) return
+
+    setInicializando(true)
+    try {
+      await criarMes(novoMesId, 0)
+      const anteriorExiste = await mesExiste(mesAnteriorId)
+      if (anteriorExiste) {
+        await propagarSaldosBancos(mesAnteriorId, novoMesId)
+        await copiarContasRecorrentes(mesAnteriorId, novoMesId)
+        await propagarFaturasNaoPagas(mesAnteriorId, novoMesId)
+      }
+      await criarTransacoesParaMes(novoMesId)
+    } catch (err) {
+      console.error('[inicializar mês]', err)
+    } finally {
+      setInicializando(false)
+    }
+  }
 
   useEffect(() => {
+    const mesAnterior = prevMesAtivoRef.current
+    prevMesAtivoRef.current = mesAtivo
+
+    const avancando = mesAtivo >= mesAnterior
+    if (!avancando) return
     if (isMonthLoading || mesInfo !== null) return
     if (inicializadoRef.current.has(mesAtivo)) return
     inicializadoRef.current.add(mesAtivo)
-    const prevId = prevMesId(mesAtivo)
-    mesExiste(prevId).then(async (existe) => {
-      if (existe) {
-        setMesOrigemId(prevId)
-        setCopiarModalOpen(true)
-      } else {
-        await criarMes(mesAtivo, 0)
-        await criarTransacoesParaMes(mesAtivo)
-      }
-    })
+
+    inicializarMesSeNecessario(mesAtivo, prevMesId(mesAtivo))
   }, [mesAtivo, mesInfo, isMonthLoading])
 
   // Clean up orphaned receivable transactions whose receivable was deleted
@@ -153,15 +171,6 @@ export function Dashboard({ userId }: { userId: string }) {
     parcelaTotal: number,
   ) {
     await excluirParcelamentosRestantes(parcelamentoId, parcelaAtualFrom, parcelaTotal, mesAtivo)
-  }
-
-  async function handleCopiarFixos() {
-    await propagarSaldosBancos(mesOrigemId)
-    await criarMes(mesAtivo, 0)
-    await propagarFaturasNaoPagas(mesOrigemId, mesAtivo)
-    await copiarFixos(mesOrigemId, mesAtivo)
-    await criarTransacoesParaMes(mesAtivo)
-    setCopiarModalOpen(false)
   }
 
   useEffect(() => {
@@ -204,6 +213,19 @@ export function Dashboard({ userId }: { userId: string }) {
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
       <Header />
+
+      {inicializando && (
+        <div style={{
+          textAlign: 'center',
+          padding: '4px 0',
+          fontSize: 11,
+          color: 'var(--text-tertiary)',
+          background: 'var(--bg-surface)',
+          borderBottom: '0.5px solid var(--border)',
+        }}>
+          Preparando mês...
+        </div>
+      )}
 
       <main
         id="tab-content"
@@ -343,19 +365,6 @@ export function Dashboard({ userId }: { userId: string }) {
         valorAtual={mesInfo?.receita ?? 0}
         onSave={setReceita}
         onClose={() => setReceitaModalOpen(false)}
-      />
-      <CopiarFixosModal
-        open={copiarModalOpen}
-        mesOrigemId={mesOrigemId}
-        mesDestinoId={mesAtivo}
-        onCopiar={handleCopiarFixos}
-        onPular={async () => {
-          await propagarSaldosBancos(mesOrigemId)
-          await criarMes(mesAtivo, 0)
-          await propagarFaturasNaoPagas(mesOrigemId, mesAtivo)
-          await criarTransacoesParaMes(mesAtivo)
-          setCopiarModalOpen(false)
-        }}
       />
     </div>
   )
