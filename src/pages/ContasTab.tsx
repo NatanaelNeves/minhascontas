@@ -24,7 +24,7 @@ interface Props {
   ) => Promise<void>
   onDesfazerPagamento: (id: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
-  onAdd: (data: ContaInput) => Promise<void>
+  onAdd: (data: ContaInput) => Promise<string>
   onUpdate: (id: string, data: Partial<ContaInput>) => Promise<void>
   onSaveParcelada?: (data: ContaInput, parcelaTotal: number, parcelaInicialAtual: number) => Promise<void>
   onDeleteParcelamento?: (parcelamentoId: string, parcelaAtualFrom: number, parcelaTotal: number) => Promise<void>
@@ -99,9 +99,19 @@ export function ContasTab({
     setPendingFaturaCartaoId(null)
   }
 
-  function handleSave(data: ContaInput) {
-    if (editando) onUpdate(editando.id, data)
-    else onAdd(data)
+  async function handleSave(data: ContaInput, pagamento?: { bancoId?: string; cartaoId?: string; data: string }) {
+    if (editando) {
+      onUpdate(editando.id, data)
+    } else if (pagamento?.bancoId && data.pago) {
+      const id = await onAdd({ ...data, pago: false })
+      await onTogglePagoComBanco(id, pagamento.bancoId, {
+        nome: data.nome, valor: data.valor, vencimento: data.vencimento,
+      }, pagamento.data)
+    } else if (pagamento?.cartaoId && data.pago) {
+      onAdd({ ...data, cartaoId: pagamento.cartaoId, pago: true })
+    } else {
+      onAdd(data)
+    }
     setEditando(null)
   }
 
@@ -334,6 +344,7 @@ export function ContasTab({
         onSaveParcelada={editando ? undefined : onSaveParcelada}
         editando={editando}
         cartoes={cartoes}
+        bancos={bancos}
         onNavigateToCartoes={onNavigateToCartoes}
       />
 

@@ -4,6 +4,8 @@ import { SaldoPatrimonial } from '@/components/Dashboard/SaldoPatrimonial'
 import { HomeResumoMes } from '@/components/Dashboard/HomeResumoMes'
 import { ResumoCards } from '@/components/Dashboard/ResumoCards'
 import { ComparacaoMeses } from '@/components/Dashboard/ComparacaoMeses'
+import { ChartsPizza } from '@/components/Charts/ChartsPizza'
+import { ChartsBarBancos } from '@/components/Charts/ChartsBarBancos'
 import { Conta, ResumoMes, BancoComSaldo, CartaoComSaldo } from '@/types'
 import { formatBRL } from '@/lib/utils'
 import { useAppStore } from '@/store/useAppStore'
@@ -14,8 +16,8 @@ interface Props {
   contas: Conta[]
   bancos: BancoComSaldo[]
   cartoesComSaldo: CartaoComSaldo[]
-  totalGastosVariaveis: number
   totalGastosBeneficios: number
+  gastosPorCategoria: Record<string, number>
   totalPendente: number
   nRecebiveis: number
   onEditReceita: () => void
@@ -27,8 +29,8 @@ export function HomeTab({
   contas,
   bancos,
   cartoesComSaldo,
-  totalGastosVariaveis,
   totalGastosBeneficios,
+  gastosPorCategoria,
   totalPendente,
   nRecebiveis,
   onEditReceita,
@@ -64,7 +66,6 @@ export function HomeTab({
         resumo={resumo}
         receita={receita}
         totalSaldoBancos={totalSaldoBancos}
-        totalGastosVariaveis={totalGastosVariaveis}
         totalGastosBeneficios={totalGastosBeneficios}
         onEditReceita={onEditReceita}
       />
@@ -75,6 +76,12 @@ export function HomeTab({
         nPagas={contas.filter(c => c.pago).length}
         nTotal={contas.length}
       />
+
+      {Object.keys(gastosPorCategoria).length > 0 && (
+        <ChartsPizza gastosPorCategoria={gastosPorCategoria} />
+      )}
+
+      {bancos.length > 0 && <ChartsBarBancos bancos={bancos} />}
 
       {totalPendente > 0 && (
         <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--amber)', letterSpacing: '-0.01em', paddingLeft: 2 }}>

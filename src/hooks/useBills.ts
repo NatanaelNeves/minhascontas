@@ -8,7 +8,7 @@ interface UseBillsReturn {
   contas: Conta[]
   resumo: ResumoMes
   isLoading: boolean
-  addConta: (conta: ContaInput) => Promise<void>
+  addConta: (conta: ContaInput) => Promise<string>
   updateConta: (id: string, data: Partial<ContaInput>) => Promise<void>
   deleteConta: (id: string) => Promise<void>
   togglePago: (id: string, pago: boolean) => Promise<void>

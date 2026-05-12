@@ -52,8 +52,8 @@ export function Dashboard({ userId }: { userId: string }) {
 
   const {
     transacoes,
-    totalGastosVariaveis,
     totalGastosBeneficios,
+    gastosPorCategoria,
     addTransacao,
     updateTransacao,
     deleteTransacao,
@@ -251,8 +251,8 @@ export function Dashboard({ userId }: { userId: string }) {
                 contas={contas}
                 bancos={bancos}
                 cartoesComSaldo={cartoesComSaldo}
-                totalGastosVariaveis={totalGastosVariaveis}
                 totalGastosBeneficios={totalGastosBeneficios}
+                gastosPorCategoria={gastosPorCategoria}
                 totalPendente={totalPendente}
                 nRecebiveis={recebiveis.length}
                 onEditReceita={() => setReceitaModalOpen(true)}

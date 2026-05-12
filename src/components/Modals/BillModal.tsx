@@ -2,17 +2,24 @@ import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { Conta, ContaInput, Categoria, FormaPagamento, Cartao, CartaoCredito } from '@/types'
+import { Conta, ContaInput, Categoria, FormaPagamento, Cartao, CartaoCredito, BancoComSaldo } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { formatMesLabel, centavosToDisplay, valorToCentStr, formatBRL, mesIdAddMeses, mesesEntreMesIds, mesIdToShortLabel } from '@/lib/utils'
+
+interface Pagamento {
+  bancoId?: string
+  cartaoId?: string
+  data: string
+}
 
 interface Props {
   open: boolean
   onClose: () => void
-  onSave: (data: ContaInput) => void
+  onSave: (data: ContaInput, pagamento?: Pagamento) => void
   onSaveParcelada?: (data: ContaInput, parcelaTotal: number, parcelaInicialAtual: number) => void
   editando?: Conta | null
   cartoes: Cartao[]
+  bancos: BancoComSaldo[]
   onNavigateToCartoes?: () => void
 }
 
@@ -94,7 +101,7 @@ const baseInput = {
   letterSpacing: '-0.01em',
 } as const
 
-export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, cartoes, onNavigateToCartoes }: Props) {
+export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, cartoes, bancos, onNavigateToCartoes }: Props) {
   const { mesAtivo } = useAppStore()
 
   const [form, setForm] = useState<ContaInput>(DEFAULT_FORM)
@@ -110,6 +117,11 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
   const [parcelaAtual, setParcelaAtual] = useState(1)
   const [mesInicio, setMesInicio] = useState('')
   const [recorrente, setRecorrente] = useState(false)
+  const [selectedBancoId, setSelectedBancoId] = useState('')
+  const [selectedCartaoId, setSelectedCartaoId] = useState('')
+  const [dataPagamento, setDataPagamento] = useState(() => new Date().toISOString().split('T')[0])
+
+  const bancosCorrente = useMemo(() => bancos.filter(b => b.tipo === 'corrente'), [bancos])
 
   const mesOptions = useMemo(() => {
     const opts: string[] = []
@@ -154,6 +166,9 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
       setValorTotalCentStr('')
       setMesInicio('')
       setRecorrente(false)
+      setSelectedBancoId(bancosCorrente[0]?.id ?? '')
+      setSelectedCartaoId('')
+      setDataPagamento(new Date().toISOString().split('T')[0])
     }
   }, [editando, open])
 
@@ -242,7 +257,14 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
       onSaveParcelada(data, parcelasTotal, parcelaAtual)
     } else {
       const parcelas = editando?.parcelas ?? (temParcelas ? { atual: parcelaAtual, total: parcelasTotal } : null)
-      onSave({ ...data, parcelas })
+      const pagamento: Pagamento | undefined = (() => {
+        if (!data.pago || editando) return undefined
+        const isCreditoSemCartao = form.formaPagamento === 'credito' && !cartaoId
+        if (isCreditoSemCartao && selectedCartaoId) return { cartaoId: selectedCartaoId, data: dataPagamento }
+        if (form.formaPagamento !== 'credito' && selectedBancoId) return { bancoId: selectedBancoId, data: dataPagamento }
+        return undefined
+      })()
+      onSave({ ...data, parcelas }, pagamento)
     }
     onClose()
   }
@@ -252,6 +274,11 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
     if (getCents() <= 0) return false
     if (form.categoria === 'cartao' && !cartaoId) return false
     if (form.categoria === 'extra' && form.formaPagamento === 'credito' && !cartaoId) return false
+    if (form.pago && !editando) {
+      const isCreditoSemCartao = form.formaPagamento === 'credito' && !cartaoId
+      if (isCreditoSemCartao && creditCards.length > 0 && !selectedCartaoId) return false
+      if (form.formaPagamento !== 'credito' && bancosCorrente.length > 0 && !selectedBancoId) return false
+    }
     return true
   })()
 
@@ -372,9 +399,9 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
                 )}
               </div>
 
-              {/* Cartão picker — aparece para categoria 'cartao' (obrigatório) ou quando forma de pagamento é crédito em 'extra' */}
+              {/* Cartão picker — aparece para 'cartao' (obrigatório) ou quando forma é crédito em 'extra'/'fixo' */}
               <AnimatePresence>
-                {(form.categoria === 'cartao' || (form.categoria === 'extra' && form.formaPagamento === 'credito')) && (
+                {(form.categoria === 'cartao' || ((form.categoria === 'extra' || form.categoria === 'fixo') && form.formaPagamento === 'credito')) && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -814,6 +841,106 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
                 </div>
                 <Toggle on={form.pago} onToggle={() => setForm(f => ({ ...f, pago: !f.pago }))} />
               </div>
+
+              {/* Banco/cartão e data — aparece quando pago=true em nova conta */}
+              <AnimatePresence>
+                {form.pago && !editando && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      <div>
+                        <Label>Data do pagamento</Label>
+                        <input
+                          type="date"
+                          value={dataPagamento}
+                          onChange={e => setDataPagamento(e.target.value)}
+                          style={{ ...baseInput, colorScheme: 'dark' }}
+                          onFocus={focusInput}
+                          onBlur={blurInput}
+                        />
+                      </div>
+
+                      {form.formaPagamento === 'credito' ? (!cartaoId ? (
+                        <div>
+                          <Label>Cartão de crédito</Label>
+                          {creditCards.length === 0 ? (
+                            <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+                              Nenhum cartão de crédito cadastrado.
+                            </p>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {creditCards.map(c => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => setSelectedCartaoId(c.id)}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    padding: '11px 14px', borderRadius: 10,
+                                    background: selectedCartaoId === c.id ? 'var(--text-primary)' : 'var(--bg-surface)',
+                                    border: selectedCartaoId === c.id ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                                    cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.cor, flexShrink: 0 }} />
+                                    <span style={{ fontSize: 14, fontWeight: 500, color: selectedCartaoId === c.id ? 'var(--bg-base)' : 'var(--text-primary)' }}>
+                                      {c.nome}
+                                    </span>
+                                  </div>
+                                  <span style={{ fontSize: 10, fontWeight: 500, padding: '2px 8px', borderRadius: 99, background: selectedCartaoId === c.id ? 'rgba(0,0,0,0.15)' : 'var(--bg-elevated)', color: selectedCartaoId === c.id ? 'var(--bg-base)' : 'var(--text-tertiary)' }}>
+                                    Crédito
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : null) : (
+                        <div>
+                          <Label>Débitar de</Label>
+                          {bancosCorrente.length === 0 ? (
+                            <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+                              Nenhum banco cadastrado.
+                            </p>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {bancosCorrente.map(b => (
+                                <button
+                                  key={b.id}
+                                  type="button"
+                                  onClick={() => setSelectedBancoId(b.id)}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    padding: '11px 14px', borderRadius: 10,
+                                    background: selectedBancoId === b.id ? 'var(--text-primary)' : 'var(--bg-surface)',
+                                    border: selectedBancoId === b.id ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                                    cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    {b.cor && <div style={{ width: 8, height: 8, borderRadius: '50%', background: b.cor, flexShrink: 0 }} />}
+                                    <span style={{ fontSize: 14, fontWeight: 500, color: selectedBancoId === b.id ? 'var(--bg-base)' : 'var(--text-primary)' }}>
+                                      {b.nome}
+                                    </span>
+                                  </div>
+                                  <span style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', color: selectedBancoId === b.id ? 'var(--bg-base)' : 'var(--text-secondary)' }}>
+                                    {formatBRL(b.saldoAtual)}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Footer */}

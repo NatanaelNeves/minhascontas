@@ -51,7 +51,7 @@ function CustomTooltip({
 }
 
 export function ChartsPizza({ gastosPorCategoria }: Props) {
-  const data = Object.entries(gastosPorCategoria)
+  const data = Object.entries(gastosPorCategoria ?? {})
     .filter(([, v]) => v > 0)
     .map(([cat, valor]) => ({
       name: CATEGORIA_LABEL[cat] ?? cat,
