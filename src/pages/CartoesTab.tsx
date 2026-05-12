@@ -1,9 +1,10 @@
-import { CartaoComSaldo, CartaoInput, Conta, FaturaCalculada, BancoComSaldo, GastoRecorrente } from '@/types'
+import { CartaoComSaldo, CartaoInput, Conta, FaturaCalculada, BancoComSaldo, GastoRecorrente, Transacao } from '@/types'
 import { CartoesList } from '@/components/Cartoes/CartoesList'
 
 interface Props {
   cartoes: CartaoComSaldo[]
   contas: Conta[]
+  transacoes: Transacao[]
   faturas: FaturaCalculada[]
   bancos: BancoComSaldo[]
   gastosRecorrentes: GastoRecorrente[]

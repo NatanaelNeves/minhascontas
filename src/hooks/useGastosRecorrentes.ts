@@ -5,6 +5,7 @@ import {
   doc,
   setDoc,
   updateDoc,
+  getDocs,
   serverTimestamp,
   writeBatch,
 } from 'firebase/firestore'
@@ -57,13 +58,32 @@ export function useGastosRecorrentes(userId: string): UseGastosRecorrentesReturn
   }
 
   async function criarTransacoesParaMes(mesId: string): Promise<void> {
-    const ativos = gastosRecorrentes.filter(r => r.ativo)
+    const recSnap = await getDocs(collection(db, recPath))
+    const ativos: GastoRecorrente[] = recSnap.docs
+      .filter(d => d.data().ativo === true)
+      .map(d => ({
+        id: d.id,
+        cartaoId: d.data().cartaoId as string,
+        descricao: d.data().descricao as string,
+        valor: d.data().valor as number,
+        categoria: d.data().categoria as string,
+        ativo: true,
+        criadoEm: d.data().criadoEm?.toDate() ?? new Date(),
+      }))
     if (ativos.length === 0) return
+
+    const txPath = `users/${userId}/months/${mesId}/transactions`
+    const existingSnap = await getDocs(collection(db, txPath))
+    const existingRecIds = new Set(
+      existingSnap.docs.map(d => d.data().recorrenteId as string | undefined).filter(Boolean),
+    )
+    const toCreate = ativos.filter(r => !existingRecIds.has(r.id))
+    if (toCreate.length === 0) return
+
     const [anoStr, mesStr] = mesId.split('-')
     const data = `${anoStr}-${mesStr}-01`
     const batch = writeBatch(db)
-    const txPath = `users/${userId}/months/${mesId}/transactions`
-    ativos.forEach(r => {
+    toCreate.forEach(r => {
       const txRef = doc(collection(db, txPath))
       batch.set(txRef, {
         tipo: 'gasto',

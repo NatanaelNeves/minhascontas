@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { FileDown } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useBills } from '@/hooks/useBills'
 import { useMonth } from '@/hooks/useMonth'
@@ -57,8 +56,6 @@ export function Dashboard({ userId }: { userId: string }) {
     transacoes,
     totalGastosVariaveis,
     totalGastosBeneficios,
-    gastosPorCategoria,
-    gastosPorDia,
     addTransacao,
     updateTransacao,
     deleteTransacao,
@@ -159,33 +156,38 @@ export function Dashboard({ userId }: { userId: string }) {
   }
 
   async function handleCopiarFixos() {
-    await criarMes(mesAtivo, 0)
     await propagarSaldosBancos(mesOrigemId)
+    await criarMes(mesAtivo, 0)
     await propagarFaturasNaoPagas(mesOrigemId, mesAtivo)
     await copiarFixos(mesOrigemId, mesAtivo)
     await criarTransacoesParaMes(mesAtivo)
     setCopiarModalOpen(false)
   }
 
-  async function exportarPDF() {
-    const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-      import('html2canvas'),
-      import('jspdf'),
-    ])
-    const el = document.getElementById('tab-content')
-    if (!el) return
-    const canvas = await html2canvas(el, { backgroundColor: '#0c0c0e', scale: 2 })
-    const pdf = new jsPDF({ unit: 'px', format: [canvas.width / 2, canvas.height / 2] })
-    pdf.addImage(
-      canvas.toDataURL('image/png'),
-      'PNG',
-      0,
-      0,
-      canvas.width / 2,
-      canvas.height / 2,
-    )
-    pdf.save(`minhascontas-${mesAtivo}.pdf`)
-  }
+  useEffect(() => {
+    async function exportarPDF() {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ])
+      const el = document.getElementById('tab-content')
+      if (!el) return
+      const canvas = await html2canvas(el, { backgroundColor: '#0c0c0e', scale: 2 })
+      const pdf = new jsPDF({ unit: 'px', format: [canvas.width / 2, canvas.height / 2] })
+      pdf.addImage(
+        canvas.toDataURL('image/png'),
+        'PNG',
+        0,
+        0,
+        canvas.width / 2,
+        canvas.height / 2,
+      )
+      pdf.save(`minhascontas-${mesAtivo}.pdf`)
+    }
+
+    document.addEventListener('export-pdf', exportarPDF)
+    return () => document.removeEventListener('export-pdf', exportarPDF)
+  }, [mesAtivo])
 
   const FAB_LABELS: Partial<Record<AbaAtiva, string>> = {
     contas: 'Adicionar conta',
@@ -217,7 +219,6 @@ export function Dashboard({ userId }: { userId: string }) {
           >
             {abaAtiva === 'home' && (
               <HomeTab
-                userId={userId}
                 resumo={resumo}
                 receita={mesInfo?.receita ?? 0}
                 contas={contas}
@@ -227,11 +228,7 @@ export function Dashboard({ userId }: { userId: string }) {
                 totalGastosBeneficios={totalGastosBeneficios}
                 totalPendente={totalPendente}
                 nRecebiveis={recebiveis.length}
-                gastosPorCategoria={gastosPorCategoria}
-                gastosPorDia={gastosPorDia}
                 onEditReceita={() => setReceitaModalOpen(true)}
-                onNavigateToBancos={() => setAbaAtiva('bancos')}
-                onNavigateToCartoes={() => setAbaAtiva('cartoes')}
               />
             )}
             {abaAtiva === 'contas' && (
@@ -306,20 +303,6 @@ export function Dashboard({ userId }: { userId: string }) {
           </motion.div>
         </AnimatePresence>
 
-        {abaAtiva === 'home' && contas.length > 0 && (
-          <div className="flex justify-center py-2">
-            <button
-              onClick={exportarPDF}
-              className="flex items-center gap-1.5 text-[12px] transition-colors"
-              style={{ color: 'rgba(255,255,255,0.18)' }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.18)')}
-            >
-              <FileDown className="w-3.5 h-3.5" />
-              Exportar PDF
-            </button>
-          </div>
-        )}
       </main>
 
       {abaAtiva !== 'home' && FAB_LABELS[abaAtiva] && (
@@ -367,8 +350,8 @@ export function Dashboard({ userId }: { userId: string }) {
         mesDestinoId={mesAtivo}
         onCopiar={handleCopiarFixos}
         onPular={async () => {
-          await criarMes(mesAtivo, 0)
           await propagarSaldosBancos(mesOrigemId)
+          await criarMes(mesAtivo, 0)
           await propagarFaturasNaoPagas(mesOrigemId, mesAtivo)
           await criarTransacoesParaMes(mesAtivo)
           setCopiarModalOpen(false)

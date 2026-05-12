@@ -1,10 +1,10 @@
 import { useAppStore } from '@/store/useAppStore'
+import { useAuth } from '@/hooks/useAuth'
 import { useMesAnterior } from '@/hooks/useMesAnterior'
 import { formatBRLShort, prevMesId, formatMesLabel } from '@/lib/utils'
 import { ResumoMes } from '@/types'
 
 interface Props {
-  userId: string
   resumoAtual: ResumoMes
 }
 
@@ -31,9 +31,10 @@ function Delta({ atual, anterior, inverted = false }: { atual: number; anterior:
   )
 }
 
-export function ComparacaoMeses({ userId, resumoAtual }: Props) {
+export function ComparacaoMeses({ resumoAtual }: Props) {
   const { mesAtivo } = useAppStore()
-  const anterior = useMesAnterior(userId, mesAtivo)
+  const { user } = useAuth()
+  const anterior = useMesAnterior(user?.uid ?? '', mesAtivo)
 
   if (!anterior) return null
 

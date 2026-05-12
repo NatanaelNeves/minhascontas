@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { CartaoComSaldo, CartaoInput, Conta, FaturaCalculada, BancoComSaldo, Cartao, GastoRecorrente } from '@/types'
+import { CartaoComSaldo, CartaoInput, Conta, FaturaCalculada, BancoComSaldo, Cartao, GastoRecorrente, Transacao } from '@/types'
 import { formatBRL } from '@/lib/utils'
-import { useAppStore } from '@/store/useAppStore'
 import { CartaoCard } from './CartaoCard'
 import { CartaoModal } from './CartaoModal'
 import { CartaoDetailSheet } from './CartaoDetailSheet'
@@ -10,6 +9,7 @@ import { SelectBancoModal } from '@/components/Modals/SelectBancoModal'
 interface Props {
   cartoes: CartaoComSaldo[]
   contas: Conta[]
+  transacoes: Transacao[]
   faturas: FaturaCalculada[]
   bancos: BancoComSaldo[]
   gastosRecorrentes: GastoRecorrente[]
@@ -24,6 +24,7 @@ interface Props {
 export function CartoesList({
   cartoes,
   contas,
+  transacoes,
   faturas,
   bancos,
   gastosRecorrentes,
@@ -34,7 +35,6 @@ export function CartoesList({
   onCancelarRecorrente,
   onNavigateToBancos,
 }: Props) {
-  const { mesAtivo } = useAppStore()
   const [modalOpen, setModalOpen] = useState(false)
   const [editando, setEditando] = useState<Cartao | null>(null)
   const [pagarFaturaId, setPagarFaturaId] = useState<string | null>(null)
@@ -133,9 +133,9 @@ export function CartoesList({
         open={detailCartao !== null}
         cartao={detailCartao}
         contas={detailCartao ? contas.filter(c => c.cartaoId === detailCartao.id) : []}
+        transacoesBeneficio={detailCartao ? transacoes.filter(t => t.cartaoId === detailCartao.id && t.tipo === 'gasto') : []}
         fatura={detailCartao ? (faturas.find(f => f.cartaoId === detailCartao.id) ?? null) : null}
         gastosRecorrentes={detailCartao ? gastosRecorrentes.filter(r => r.cartaoId === detailCartao.id && r.ativo) : []}
-        mesAtivo={mesAtivo}
         onClose={() => setDetailCartao(null)}
         onPagarFatura={() => {
           if (detailCartao) { setPagarFaturaId(detailCartao.id); setDetailCartao(null) }

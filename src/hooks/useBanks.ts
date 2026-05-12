@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import {
   collection,
   onSnapshot,
@@ -30,9 +30,6 @@ function docToBanco(snap: QueryDocumentSnapshot<DocumentData>): Banco {
 
 export interface UseBanksReturn {
   bancos: BancoComSaldo[]
-  totalSaldo: number
-  totalInvestido: number
-  bancosPorTipo: { corrente: BancoComSaldo[]; investimento: BancoComSaldo[] }
   isLoading: boolean
   addBanco: (b: BancoInput) => Promise<void>
   updateBanco: (id: string, data: Partial<BancoInput>) => Promise<void>
@@ -45,6 +42,7 @@ export function useBanks(
 ): UseBanksReturn {
   const [bancosRaw, setBancosRaw] = useState<Banco[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const migrationRan = useRef(false)
 
   const path = `users/${userId}/banks`
 
@@ -58,9 +56,10 @@ export function useBanks(
     return unsub
   }, [userId])
 
-  // One-time migration: move per-month banks to global
+  // One-time migration: move per-month banks to global collection
   useEffect(() => {
-    if (!userId) return
+    if (!userId || migrationRan.current) return
+    migrationRan.current = true
     const userRef = doc(db, `users/${userId}`)
     getDoc(userRef).then(async (snap) => {
       if (snap.exists() && snap.data()?.bancosMigrado) return
@@ -115,21 +114,6 @@ export function useBanks(
     [bancosRaw, porBanco],
   )
 
-  const totalSaldo = useMemo(
-    () => bancos.filter(b => b.tipo === 'corrente').reduce((s, b) => s + b.saldoAtual, 0),
-    [bancos],
-  )
-
-  const totalInvestido = useMemo(
-    () => bancos.filter(b => b.tipo === 'investimento').reduce((s, b) => s + b.saldoAtual, 0),
-    [bancos],
-  )
-
-  const bancosPorTipo = useMemo(() => ({
-    corrente: bancos.filter(b => b.tipo === 'corrente'),
-    investimento: bancos.filter(b => b.tipo === 'investimento'),
-  }), [bancos])
-
   async function addBanco(b: BancoInput) {
     await addDoc(collection(db, path), { ...b, criadoEm: serverTimestamp() })
   }
@@ -145,5 +129,5 @@ export function useBanks(
     return null
   }
 
-  return { bancos, totalSaldo, totalInvestido, bancosPorTipo, isLoading, addBanco, updateBanco, deleteBanco }
+  return { bancos, isLoading, addBanco, updateBanco, deleteBanco }
 }

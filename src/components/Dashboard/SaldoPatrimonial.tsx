@@ -2,14 +2,15 @@ import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { BancoComSaldo, CartaoComSaldo } from '@/types'
 import { formatBRL } from '@/lib/utils'
+import { useAppStore } from '@/store/useAppStore'
 
 interface Props {
   bancos: BancoComSaldo[]
   cartoesComSaldo: CartaoComSaldo[]
-  onNavigateToBancos: () => void
 }
 
-export function SaldoPatrimonial({ bancos, cartoesComSaldo, onNavigateToBancos }: Props) {
+export function SaldoPatrimonial({ bancos, cartoesComSaldo }: Props) {
+  const { setAbaAtiva } = useAppStore()
   const corrente = useMemo(() => bancos.filter(b => b.tipo === 'corrente'), [bancos])
   const investimento = useMemo(() => bancos.filter(b => b.tipo === 'investimento'), [bancos])
 
@@ -83,7 +84,7 @@ export function SaldoPatrimonial({ bancos, cartoesComSaldo, onNavigateToBancos }
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>🏦 Em bancos</span>
               <button
-                onClick={onNavigateToBancos}
+                onClick={() => setAbaAtiva('bancos')}
                 style={{
                   fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)',
                   background: 'none', border: 'none', cursor: 'pointer', padding: 0,
@@ -160,7 +161,7 @@ export function SaldoPatrimonial({ bancos, cartoesComSaldo, onNavigateToBancos }
         </motion.div>
       )}
 
-      {/* Bloco C: Crédito disponível */}
+      {/* Bloco C: Limite de crédito */}
       {cartoesCredito.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -168,19 +169,24 @@ export function SaldoPatrimonial({ bancos, cartoesComSaldo, onNavigateToBancos }
           transition={{ duration: 0.3, delay: 0.08 }}
           style={{
             background: 'var(--bg-surface)',
-            border: '1px solid rgba(96,165,250,0.2)',
+            border: '1px solid rgba(96,165,250,0.15)',
             borderRadius: 'var(--radius-lg)',
             overflow: 'hidden',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px' }}>
-            <p style={{
-              fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)',
-              letterSpacing: '0.12em', textTransform: 'uppercase',
-            }}>
-              Crédito disponível
-            </p>
-            <span style={{ fontSize: 18, fontWeight: 600, color: '#60a5fa', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', gap: 12 }}>
+            <div>
+              <p style={{
+                fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)',
+                letterSpacing: '0.12em', textTransform: 'uppercase',
+              }}>
+                Limite de crédito
+              </p>
+              <p style={{ fontSize: 10, color: 'var(--text-tertiary)', fontStyle: 'italic', marginTop: 3 }}>
+                Capacidade de compra — não entra no seu saldo
+              </p>
+            </div>
+            <span style={{ fontSize: 18, fontWeight: 600, color: '#60a5fa', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
               {formatBRL(totalCreditoDisponivel)}
             </span>
           </div>

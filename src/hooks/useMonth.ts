@@ -127,32 +127,42 @@ export function useMonth(userId: string): UseMonthReturn {
   }
 
   async function propagarSaldosBancos(mesAnteriorId: string): Promise<void> {
-    const [txsSnap, bancosSnap] = await Promise.all([
-      getDocs(collection(db, `users/${userId}/months/${mesAnteriorId}/transactions`)),
+    const [bancosSnap, txsSnap] = await Promise.all([
       getDocs(collection(db, `users/${userId}/banks`)),
+      getDocs(collection(db, `users/${userId}/months/${mesAnteriorId}/transactions`)),
     ])
 
-    const txs = txsSnap.docs.map(d => d.data())
     const batch = writeBatch(db)
 
-    bancosSnap.docs.forEach(bancoDoc => {
+    for (const bancoDoc of bancosSnap.docs) {
       const banco = bancoDoc.data()
-      if ((banco.tipo as string) === 'investimento') return
+      if ((banco.tipo as string) === 'investimento') continue
 
-      const gastos = txs
-        .filter(t => t.bancoId === bancoDoc.id && (t.tipo as string) === 'gasto' && !t.cartaoId)
-        .reduce((sum, t) => sum + (t.valor as number), 0)
+      const entradas = txsSnap.docs
+        .filter(t =>
+          t.data().bancoId === bancoDoc.id &&
+          (t.data().tipo as string) === 'entrada'
+        )
+        .reduce((sum, t) => sum + (t.data().valor as number), 0)
 
-      const entradas = txs
-        .filter(t => t.bancoId === bancoDoc.id && (t.tipo as string) === 'entrada')
-        .reduce((sum, t) => sum + (t.valor as number), 0)
+      // Inclui pagamentos de fatura (têm bancoId, sem cartaoId)
+      // Exclui gastos de cartão de crédito (têm cartaoId — debitam limite, não banco)
+      const gastos = txsSnap.docs
+        .filter(t =>
+          t.data().bancoId === bancoDoc.id &&
+          (t.data().tipo as string) === 'gasto' &&
+          !t.data().cartaoId
+        )
+        .reduce((sum, t) => sum + (t.data().valor as number), 0)
 
-      batch.update(doc(db, `users/${userId}/banks/${bancoDoc.id}`), {
-        saldoInicial: (banco.saldoInicial as number) + entradas - gastos,
-      })
-    })
+      const novoSaldoInicial = (banco.saldoInicial as number) + entradas - gastos
+      console.log(`[propagação] ${banco.nome as string}: ${banco.saldoInicial as number} + ${entradas} - ${gastos} = ${novoSaldoInicial}`)
+
+      batch.update(bancoDoc.ref, { saldoInicial: novoSaldoInicial })
+    }
 
     await batch.commit()
+    console.log('[propagação] saldos atualizados')
   }
 
   async function criarContaComParcelas(
@@ -212,7 +222,6 @@ export function useMonth(userId: string): UseMonthReturn {
     if (cartoesCredito.length === 0) return
 
     const txsSnap = await getDocs(collection(db, `users/${userId}/months/${mesAnteriorId}/transactions`))
-    const billsDestinoSnap = await getDocs(collection(db, `users/${userId}/months/${mesDestinoId}/bills`))
 
     for (const cartaoDoc of cartoesCredito) {
       const cartao = cartaoDoc.data()
@@ -228,11 +237,16 @@ export function useMonth(userId: string): UseMonthReturn {
       }, 0)
       if (totalAvulso <= 0) continue
 
-      const jaExiste = billsDestinoSnap.docs.some(d => {
-        const data = d.data()
-        return data.origem?.tipo === 'fatura_propagada' && data.origem?.mesOrigem === mesAnteriorId && data.cartaoId === cartaoId
-      })
-      if (jaExiste) continue
+      // Per-cartaoId query ensures concurrent calls don't bypass dedup via stale snapshot
+      const existingSnap = await getDocs(
+        query(
+          collection(db, `users/${userId}/months/${mesDestinoId}/bills`),
+          where('origem.tipo', '==', 'fatura_propagada'),
+          where('origem.mesOrigem', '==', mesAnteriorId),
+          where('cartaoId', '==', cartaoId),
+        ),
+      )
+      if (!existingSnap.empty) continue
 
       const mesLabel = mesIdToShortLabel(mesAnteriorId)
       await addDoc(collection(db, `users/${userId}/months/${mesDestinoId}/bills`), {

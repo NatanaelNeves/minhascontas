@@ -103,13 +103,16 @@ export function useReceivables(userId: string, mesId: string): UseReceivablesRet
   }
 
   async function deleteRecebivel(id: string) {
+    const recebivel = recebiveis.find(r => r.id === id)
     const isGlobal = globalRecebiveis.some(r => r.id === id)
     const batch = writeBatch(db)
     batch.delete(doc(db, isGlobal ? globalRecPath : recPath, id))
     if (isGlobal) {
       batch.delete(doc(db, globalStatusPath, id))
     }
-    batch.delete(doc(db, txPath, `receivable_${id}`))
+    if (recebivel?.recebido) {
+      batch.delete(doc(db, txPath, `receivable_${id}`))
+    }
     await batch.commit()
   }
 

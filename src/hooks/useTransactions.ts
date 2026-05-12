@@ -13,7 +13,7 @@ import {
   DocumentData,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Transacao, TransacaoInput } from '@/types'
+import { Transacao, TransacaoInput, TIPOS_BENEFICIO, TipoBeneficio } from '@/types'
 
 function docToTransacao(snap: QueryDocumentSnapshot<DocumentData>): Transacao {
   const d = snap.data()
@@ -26,7 +26,9 @@ function docToTransacao(snap: QueryDocumentSnapshot<DocumentData>): Transacao {
     despesaFixa: d.despesaFixa ?? false,
     observacao: d.observacao,
     cartaoId: d.cartaoId ?? undefined,
+    formaPagamento: d.formaPagamento ?? undefined,
     origem: d.origem,
+    recorrenteId: d.recorrenteId ?? undefined,
     criadoEm: d.criadoEm?.toDate() ?? new Date(),
   }
   if (d.tipo === 'gasto') {
@@ -39,6 +41,7 @@ export interface UseTransactionsReturn {
   transacoes: Transacao[]
   totalGastos: number
   totalGastosVariaveis: number
+  totalGastosBeneficios: number
   totalEntradas: number
   gastosPorCategoria: Record<string, number>
   gastosPorDia: { data: string; total: number }[]
@@ -72,7 +75,23 @@ export function useTransactions(userId: string, mesId: string): UseTransactionsR
 
   const totalGastosVariaveis = useMemo(
     () => transacoes
-      .filter(t => t.tipo === 'gasto' && t.origem?.tipo !== 'pagamento_fatura')
+      .filter(t =>
+        t.tipo === 'gasto' &&
+        t.origem?.tipo !== 'pagamento_fatura' &&
+        t.origem?.tipo !== 'bill' &&
+        (t.formaPagamento == null || !TIPOS_BENEFICIO.includes(t.formaPagamento as TipoBeneficio))
+      )
+      .reduce((s, t) => s + t.valor, 0),
+    [transacoes],
+  )
+
+  const totalGastosBeneficios = useMemo(
+    () => transacoes
+      .filter(t =>
+        t.tipo === 'gasto' &&
+        t.formaPagamento != null &&
+        TIPOS_BENEFICIO.includes(t.formaPagamento as TipoBeneficio)
+      )
       .reduce((s, t) => s + t.valor, 0),
     [transacoes],
   )
@@ -120,6 +139,7 @@ export function useTransactions(userId: string, mesId: string): UseTransactionsR
     transacoes,
     totalGastos,
     totalGastosVariaveis,
+    totalGastosBeneficios,
     totalEntradas,
     gastosPorCategoria,
     gastosPorDia,

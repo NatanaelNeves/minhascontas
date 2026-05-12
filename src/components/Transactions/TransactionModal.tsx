@@ -478,8 +478,8 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
                 </div>
               )}
 
-              {/* Cartão (gastos only, only credit cartoes) */}
-              {tipo === 'gasto' && creditCartoes.length > 0 && (
+              {/* Cartão (gastos only, only credit cartoes, not when dedicated selectors already handle it) */}
+              {tipo === 'gasto' && creditCartoes.length > 0 && !usaCartaoCredito && !usaBeneficio && (
                 <div>
                   <Label>Cartão (opcional)</Label>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

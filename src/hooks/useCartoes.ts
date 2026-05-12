@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import {
   collection,
   onSnapshot,
@@ -6,6 +6,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDocs,
   serverTimestamp,
   deleteField,
   QueryDocumentSnapshot,
@@ -79,14 +80,17 @@ export interface UseCartoesReturn {
 export function useCartoes(userId: string): UseCartoesReturn {
   const [cartoes, setCartoes] = useState<Cartao[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const migrationRan = useRef(false)
 
   const path = `users/${userId}/cartoes`
 
+  // One-time migration: benefit cards may have 'limite' instead of 'saldoAtual'
   useEffect(() => {
-    if (!userId) return
-    setIsLoading(true)
-    const unsub = onSnapshot(collection(db, path), snap => {
-      snap.docs.forEach(async (docSnap) => {
+    if (!userId || migrationRan.current) return
+    migrationRan.current = true
+    async function runMigration() {
+      const snap = await getDocs(collection(db, path))
+      for (const docSnap of snap.docs) {
         const data = docSnap.data()
         if (isTipoBeneficio(data.tipo) && typeof data.saldoAtual !== 'number') {
           const saldoAtual = typeof data.limite === 'number' ? data.limite : 0
@@ -97,7 +101,15 @@ export function useCartoes(userId: string): UseCartoesReturn {
             diaVencimento: deleteField(),
           })
         }
-      })
+      }
+    }
+    runMigration()
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) return
+    setIsLoading(true)
+    const unsub = onSnapshot(collection(db, path), snap => {
       setCartoes(snap.docs.map(docToCartao))
       setIsLoading(false)
     })

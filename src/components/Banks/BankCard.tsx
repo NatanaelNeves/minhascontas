@@ -155,10 +155,12 @@ export function BankCard({ banco, onEdit, onDelete, onUpdate }: Props) {
       >
         {formatBRL(banco.saldoAtual)}
       </span>
-      <div className="flex gap-4 text-xs">
-        <span style={{ color: 'var(--green)' }}>↑ {formatBRL(banco.entradas)}</span>
-        <span style={{ color: 'var(--red)' }}>↓ {formatBRL(banco.gastos)}</span>
-      </div>
+      {(banco.entradas > 0 || banco.gastos > 0) && (
+        <div className="flex gap-4 text-xs">
+          {banco.entradas > 0 && <span style={{ color: 'var(--green)' }}>↑ {formatBRL(banco.entradas)}</span>}
+          {banco.gastos > 0 && <span style={{ color: 'var(--red)' }}>↓ {formatBRL(banco.gastos)}</span>}
+        </div>
+      )}
     </motion.div>
   )
 }

@@ -19,7 +19,7 @@ function ChevronBtn({ onClick, children }: { onClick: () => void; children: Reac
 
 export function Header() {
   const { user, logout } = useAuth()
-  const { mesAtivo, setMesAtivo, currentPage, setCurrentPage } = useAppStore()
+  const { mesAtivo, setMesAtivo, currentPage, setCurrentPage, abaAtiva } = useAppStore()
 
   return (
     <header
@@ -90,8 +90,25 @@ export function Header() {
           </span>
         )}
 
-        {/* Right — history + avatar */}
+        {/* Right — pdf + history + avatar */}
         <div className="flex items-center gap-2 shrink-0">
+          {currentPage === 'dashboard' && abaAtiva === 'home' && (
+            <button
+              onClick={() => document.dispatchEvent(new CustomEvent('export-pdf'))}
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+              title="Exportar PDF"
+              style={{ color: 'var(--text-tertiary)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="2" y="1" width="7" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+                <path d="M5 4h3M5 6.5h3M5 9h1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+                <path d="M9 9l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                <circle cx="11" cy="12" r="1.5" fill="currentColor" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={() => setCurrentPage(currentPage === 'history' ? 'dashboard' : 'history')}
             className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"

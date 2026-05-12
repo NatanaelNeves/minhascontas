@@ -2,17 +2,11 @@ import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { CartaoComSaldo, Conta, FaturaCalculada, GastoRecorrente } from '@/types'
+import { CartaoComSaldo, Conta, FaturaCalculada, GastoRecorrente, Transacao } from '@/types'
 import { formatBRL, mesIdAddMeses, mesIdToShortLabel } from '@/lib/utils'
+import { getLabelTipoCartao } from '@/lib/cartoes'
+import { useAppStore } from '@/store/useAppStore'
 import { ConfirmDeleteModal } from '@/components/Modals/ConfirmDeleteModal'
-
-const TIPO_LABEL: Record<string, string> = {
-  credito: 'Crédito',
-  vale_alimentacao: 'Vale Alim.',
-  vale_combustivel: 'Vale Comb.',
-  vale_refeicao: 'Vale Ref.',
-  outros_beneficios: 'Benefício',
-}
 
 interface Props {
   open: boolean
@@ -20,7 +14,7 @@ interface Props {
   contas: Conta[]
   fatura: FaturaCalculada | null
   gastosRecorrentes: GastoRecorrente[]
-  mesAtivo: string
+  transacoesBeneficio: Transacao[]
   onClose: () => void
   onPagarFatura: () => void
   onCancelarRecorrente: (id: string) => Promise<void>
@@ -42,8 +36,10 @@ function parcelaCorBorder(mr: number) {
   return 'rgba(239,68,68,0.25)'
 }
 
-export function CartaoDetailSheet({ open, cartao, contas, fatura, gastosRecorrentes, mesAtivo, onClose, onPagarFatura, onCancelarRecorrente }: Props) {
+export function CartaoDetailSheet({ open, cartao, contas, fatura, gastosRecorrentes, transacoesBeneficio, onClose, onPagarFatura, onCancelarRecorrente }: Props) {
+  const { mesAtivo } = useAppStore()
   const [cancelarRecorrenteId, setCancelarRecorrenteId] = useState<string | null>(null)
+
   const parcelamentos = useMemo(() => {
     const seen = new Set<string>()
     return contas.filter(c => {
@@ -54,11 +50,21 @@ export function CartaoDetailSheet({ open, cartao, contas, fatura, gastosRecorren
     })
   }, [contas])
 
-  const avulsos = useMemo(() => contas.filter(c => !c.parcelamentoId), [contas])
+  // For credit cards use fatura (transactions), for benefit cards use bills
+  const creditAvulsos = useMemo(() => {
+    if (!cartao || cartao.tipo !== 'credito') return []
+    return fatura?.gastosAvulsos ?? []
+  }, [cartao, fatura])
+
+  const benefitAvulsos = useMemo(() => {
+    if (!cartao || cartao.tipo === 'credito') return []
+    return contas.filter(c => !c.parcelamentoId)
+  }, [cartao, contas])
 
   const totalParcelamentos = parcelamentos.reduce((s, c) => s + c.valor, 0)
-  const totalAvulsos = avulsos.reduce((s, c) => s + c.valor, 0)
-  const totalFatura = totalParcelamentos + totalAvulsos
+  const totalFatura = cartao?.tipo === 'credito'
+    ? (fatura?.total ?? totalParcelamentos)
+    : transacoesBeneficio.reduce((s, t) => s + t.valor, 0)
 
   const pct = cartao ? Math.min(cartao.percentualUsado, 100) : 0
   const barColor = pct >= 90 ? 'var(--red)' : pct >= 70 ? 'var(--amber)' : 'var(--green)'
@@ -114,7 +120,7 @@ export function CartaoDetailSheet({ open, cartao, contas, fatura, gastosRecorren
                     background: 'var(--bg-surface)', color: 'var(--text-tertiary)',
                     letterSpacing: '0.02em', flexShrink: 0,
                   }}>
-                    {TIPO_LABEL[cartao.tipo]}
+                    {getLabelTipoCartao(cartao.tipo)}
                   </span>
                 </div>
                 {cartao.tipo === 'credito' && cartao.limite > 0 && (
@@ -208,14 +214,47 @@ export function CartaoDetailSheet({ open, cartao, contas, fatura, gastosRecorren
                 </div>
               )}
 
-              {/* Gastos avulsos */}
-              {avulsos.length > 0 && (
+              {/* Gastos avulsos — credit cards: transactions from fatura */}
+              {cartao.tipo === 'credito' && creditAvulsos.length > 0 && (
                 <div>
                   <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 10 }}>
                     Gastos avulsos do mês
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {avulsos.map(conta => (
+                    {creditAvulsos.map(t => (
+                      <div key={t.id} style={{
+                        padding: '10px 14px',
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                      }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {t.descricao}
+                          </p>
+                          <p style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 1 }}>
+                            {new Date(t.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                            {t.tipo === 'gasto' ? ` · ${t.categoria}` : ''}
+                          </p>
+                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                          {formatBRL(t.valor)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Gastos avulsos — benefit cards: bills */}
+              {cartao.tipo !== 'credito' && benefitAvulsos.length > 0 && (
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 10 }}>
+                    Gastos avulsos do mês
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {benefitAvulsos.map(conta => (
                       <div key={conta.id} style={{
                         padding: '10px 14px',
                         background: 'var(--bg-surface)',
@@ -228,6 +267,39 @@ export function CartaoDetailSheet({ open, cartao, contas, fatura, gastosRecorren
                         </p>
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                           {formatBRL(conta.valor)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Gastos benefício do mês — benefit cards only */}
+              {cartao.tipo !== 'credito' && transacoesBeneficio.length > 0 && (
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 10 }}>
+                    Gastos do mês
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {transacoesBeneficio.map(t => (
+                      <div key={t.id} style={{
+                        padding: '10px 14px',
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                      }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {t.descricao}
+                          </p>
+                          <p style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 1 }}>
+                            {new Date(t.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                            {t.tipo === 'gasto' ? ` · ${t.categoria}` : ''}
+                          </p>
+                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                          {formatBRL(t.valor)}
                         </span>
                       </div>
                     ))}
@@ -283,7 +355,7 @@ export function CartaoDetailSheet({ open, cartao, contas, fatura, gastosRecorren
               )}
 
               {/* Empty state */}
-              {parcelamentos.length === 0 && avulsos.length === 0 && gastosRecorrentes.length === 0 && (
+              {parcelamentos.length === 0 && creditAvulsos.length === 0 && benefitAvulsos.length === 0 && transacoesBeneficio.length === 0 && gastosRecorrentes.length === 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 0', gap: 8 }}>
                   <span style={{ fontSize: 32 }}>💳</span>
                   <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Nenhum gasto neste mês</p>
@@ -292,37 +364,59 @@ export function CartaoDetailSheet({ open, cartao, contas, fatura, gastosRecorren
             </div>
 
             {/* Footer: fatura resumo */}
-            {(parcelamentos.length > 0 || avulsos.length > 0 || (fatura && fatura.total > 0)) && (
+            {(parcelamentos.length > 0 || creditAvulsos.length > 0 || benefitAvulsos.length > 0 || transacoesBeneficio.length > 0 || (fatura && fatura.total > 0)) && (
               <div style={{ borderTop: '0.5px solid var(--border)', padding: '16px 22px', flexShrink: 0 }}>
                 <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 10 }}>
-                  Resumo da fatura
+                  {cartao.tipo === 'credito' ? 'Resumo da fatura' : 'Resumo do mês'}
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {(fatura ? fatura.totalAvulso > 0 : avulsos.length > 0) && (
+                  {cartao.tipo !== 'credito' && transacoesBeneficio.length > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                        Gastos avulsos ({fatura ? fatura.gastosAvulsos.length : avulsos.length})
+                        Gastos ({transacoesBeneficio.length})
                       </span>
                       <span style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
-                        {formatBRL(fatura ? fatura.totalAvulso : totalAvulsos)}
+                        {formatBRL(transacoesBeneficio.reduce((s, t) => s + t.valor, 0))}
                       </span>
                     </div>
                   )}
-                  {(fatura ? fatura.totalParcelas > 0 : parcelamentos.length > 0) && (
+                  {cartao.tipo === 'credito' && fatura && fatura.totalAvulso > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                        Parcelas do mês ({fatura ? fatura.contasParceladas.length : parcelamentos.length})
+                        Gastos avulsos ({fatura.gastosAvulsos.length})
                       </span>
                       <span style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
-                        {formatBRL(fatura ? fatura.totalParcelas : totalParcelamentos)}
+                        {formatBRL(fatura.totalAvulso)}
+                      </span>
+                    </div>
+                  )}
+                  {cartao.tipo === 'credito' && fatura && fatura.totalParcelas > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                        Parcelas do mês ({fatura.contasParceladas.length})
+                      </span>
+                      <span style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
+                        {formatBRL(fatura.totalParcelas)}
+                      </span>
+                    </div>
+                  )}
+                  {cartao.tipo === 'credito' && !fatura && parcelamentos.length > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                        Parcelas do mês ({parcelamentos.length})
+                      </span>
+                      <span style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
+                        {formatBRL(totalParcelamentos)}
                       </span>
                     </div>
                   )}
                   <div style={{ height: 1, background: 'var(--border)', margin: '3px 0' }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Total da fatura</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {cartao.tipo === 'credito' ? 'Total da fatura' : 'Total gasto'}
+                    </span>
                     <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
-                      {formatBRL(fatura ? fatura.total : totalFatura)}
+                      {formatBRL(totalFatura)}
                     </span>
                   </div>
                   {cartao.tipo === 'credito' && (
