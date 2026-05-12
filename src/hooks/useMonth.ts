@@ -5,6 +5,7 @@ import {
   setDoc,
   collection,
   getDocs,
+  onSnapshot,
   serverTimestamp,
   addDoc,
   deleteDoc,
@@ -24,7 +25,6 @@ interface UseMonthReturn {
   criarMes: (mesId: string, receita: number) => Promise<void>
   copiarContasRecorrentes: (mesOrigemId: string, mesDestinoId: string) => Promise<void>
   mesExiste: (mesId: string) => Promise<boolean>
-  propagarSaldosBancos: (mesAnteriorId: string, novoMesId: string) => Promise<void>
   propagarFaturasNaoPagas: (mesAnteriorId: string, mesDestinoId: string) => Promise<void>
   criarContaComParcelas: (
     conta: ContaInput,
@@ -50,19 +50,19 @@ export function useMonth(userId: string): UseMonthReturn {
 
     setIsLoading(true)
     const infoRef = doc(db, `users/${userId}/months/${mesAtivo}`)
-    getDoc(infoRef).then((snap) => {
+    const unsubscribe = onSnapshot(infoRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data()
         setMesInfo({
           receita: data.receita,
           criadoEm: data.criadoEm?.toDate() ?? new Date(),
-          saldosIniciais: (data.saldosIniciais as Record<string, number> | undefined) ?? undefined,
         })
       } else {
         setMesInfo(null)
       }
       setIsLoading(false)
     })
+    return () => unsubscribe()
   }, [userId, mesAtivo])
 
   async function setReceita(valor: number) {
@@ -97,8 +97,11 @@ export function useMonth(userId: string): UseMonthReturn {
   }
 
   async function copiarContasRecorrentes(mesOrigemId: string, mesDestinoId: string) {
-    const snap = await getDocs(collection(db, `users/${userId}/months/${mesOrigemId}/bills`))
     const destCol = collection(db, `users/${userId}/months/${mesDestinoId}/bills`)
+    const jaExistem = await getDocs(query(destCol, where('recorrente', '==', true)))
+    if (!jaExistem.empty) return
+
+    const snap = await getDocs(collection(db, `users/${userId}/months/${mesOrigemId}/bills`))
     const batch = writeBatch(db)
 
     for (const docSnap of snap.docs) {
@@ -125,44 +128,6 @@ export function useMonth(userId: string): UseMonthReturn {
     }
 
     await batch.commit()
-  }
-
-  async function propagarSaldosBancos(mesAnteriorId: string, novoMesId: string): Promise<void> {
-    const mesNovoRef = doc(db, `users/${userId}/months/${novoMesId}`)
-    const [mesNovoSnap, bancosSnap, mesAnteriorSnap, txsSnap] = await Promise.all([
-      getDoc(mesNovoRef),
-      getDocs(collection(db, `users/${userId}/banks`)),
-      getDoc(doc(db, `users/${userId}/months/${mesAnteriorId}`)),
-      getDocs(collection(db, `users/${userId}/months/${mesAnteriorId}/transactions`)),
-    ])
-
-    if (mesNovoSnap.exists() && mesNovoSnap.data()?.saldosPropagados === true) return
-
-    const saldosBaseAnterior = (mesAnteriorSnap.data()?.saldosIniciais ?? {}) as Record<string, number>
-
-    const saldosIniciais: Record<string, number> = {}
-    for (const bancoDoc of bancosSnap.docs) {
-      const banco = bancoDoc.data()
-      if ((banco.tipo as string) === 'investimento') continue
-
-      const saldoBase = saldosBaseAnterior[bancoDoc.id] ?? (banco.saldoInicial as number)
-
-      const entradas = txsSnap.docs
-        .filter(t => t.data().bancoId === bancoDoc.id && (t.data().tipo as string) === 'entrada')
-        .reduce((sum, t) => sum + (t.data().valor as number), 0)
-
-      const gastos = txsSnap.docs
-        .filter(t =>
-          t.data().bancoId === bancoDoc.id &&
-          (t.data().tipo as string) === 'gasto' &&
-          !t.data().cartaoId
-        )
-        .reduce((sum, t) => sum + (t.data().valor as number), 0)
-
-      saldosIniciais[bancoDoc.id] = Number((saldoBase + entradas - gastos).toFixed(2))
-    }
-
-    await setDoc(mesNovoRef, { saldosIniciais, saldosPropagados: true }, { merge: true })
   }
 
   async function criarContaComParcelas(
@@ -264,5 +229,5 @@ export function useMonth(userId: string): UseMonthReturn {
     }
   }
 
-  return { mesInfo, isLoading, setReceita, criarMes, copiarContasRecorrentes, mesExiste, propagarSaldosBancos, propagarFaturasNaoPagas, criarContaComParcelas, excluirParcelamentosRestantes }
+  return { mesInfo, isLoading, setReceita, criarMes, copiarContasRecorrentes, mesExiste, propagarFaturasNaoPagas, criarContaComParcelas, excluirParcelamentosRestantes }
 }

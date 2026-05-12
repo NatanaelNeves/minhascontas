@@ -34,7 +34,6 @@ export function Dashboard({ userId }: { userId: string }) {
     criarMes,
     copiarContasRecorrentes,
     mesExiste,
-    propagarSaldosBancos,
     propagarFaturasNaoPagas,
     criarContaComParcelas,
     excluirParcelamentosRestantes,
@@ -60,10 +59,12 @@ export function Dashboard({ userId }: { userId: string }) {
     deleteTransacao,
   } = useTransactions(userId, mesAtivo)
 
+  const { transacoes: transacoesAnteriores } = useTransactions(userId, prevMesId(mesAtivo))
+
   const { bancos, addBanco, updateBanco, deleteBanco } = useBanks(
     userId,
     transacoes,
-    mesInfo?.saldosIniciais,
+    transacoesAnteriores,
   )
 
   const {
@@ -113,18 +114,21 @@ export function Dashboard({ userId }: { userId: string }) {
   const [receitaModalOpen, setReceitaModalOpen] = useState(false)
   const [inicializando, setInicializando] = useState(false)
   const inicializadoRef = useRef<Set<string>>(new Set())
+  const inicializandoRef = useRef(false)
   const prevMesAtivoRef = useRef(mesAtivo)
 
   async function inicializarMesSeNecessario(novoMesId: string, mesAnteriorId: string) {
-    const jaExiste = await mesExiste(novoMesId)
-    if (jaExiste) return
+    if (inicializandoRef.current) return
+    inicializandoRef.current = true
 
-    setInicializando(true)
     try {
+      const jaExiste = await mesExiste(novoMesId)
+      if (jaExiste) return
+
+      setInicializando(true)
       await criarMes(novoMesId, 0)
       const anteriorExiste = await mesExiste(mesAnteriorId)
       if (anteriorExiste) {
-        await propagarSaldosBancos(mesAnteriorId, novoMesId)
         await copiarContasRecorrentes(mesAnteriorId, novoMesId)
         await propagarFaturasNaoPagas(mesAnteriorId, novoMesId)
       }
@@ -132,6 +136,7 @@ export function Dashboard({ userId }: { userId: string }) {
     } catch (err) {
       console.error('[inicializar mês]', err)
     } finally {
+      inicializandoRef.current = false
       setInicializando(false)
     }
   }

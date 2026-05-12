@@ -22,7 +22,7 @@ function docToBanco(snap: QueryDocumentSnapshot<DocumentData>): Banco {
     id: snap.id,
     nome: d.nome,
     tipo: (d.tipo as TipoBanco) ?? 'corrente',
-    saldoInicial: d.saldoInicial,
+    saldoInicial: d.saldoInicial ?? 0,
     cor: d.cor ?? undefined,
     criadoEm: d.criadoEm?.toDate() ?? new Date(),
   }
@@ -39,6 +39,7 @@ export interface UseBanksReturn {
 export function useBanks(
   userId: string,
   transacoes: Transacao[],
+  transacoesAnteriores: Transacao[],
 ): UseBanksReturn {
   const [bancosRaw, setBancosRaw] = useState<Banco[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -86,32 +87,31 @@ export function useBanks(
     })
   }, [userId])
 
-  const porBanco = useMemo(() => {
-    const map: Record<string, Transacao[]> = {}
-    transacoes.forEach(t => {
-      if (!t.bancoId) return
-      if (!map[t.bancoId]) map[t.bancoId] = []
-      map[t.bancoId].push(t)
-    })
-    return map
-  }, [transacoes])
-
   const bancos = useMemo<BancoComSaldo[]>(
     () =>
       bancosRaw.map(b => {
         if (b.tipo === 'investimento') {
           return { ...b, gastos: 0, entradas: 0, saldoAtual: b.saldoInicial }
         }
-        const txs = porBanco[b.id] ?? []
-        const gastos = txs
-          .filter(t => t.tipo === 'gasto' && !t.cartaoId)
+
+        const entradasAnt = transacoesAnteriores
+          .filter(t => t.bancoId === b.id && t.tipo === 'entrada')
           .reduce((s, t) => s + t.valor, 0)
-        const entradas = txs
-          .filter(t => t.tipo === 'entrada')
+        const gastosAnt = transacoesAnteriores
+          .filter(t => t.bancoId === b.id && t.tipo === 'gasto' && !t.cartaoId)
           .reduce((s, t) => s + t.valor, 0)
-        return { ...b, gastos, entradas, saldoAtual: b.saldoInicial + entradas - gastos }
+        const saldoBase = b.saldoInicial + entradasAnt - gastosAnt
+
+        const gastos = transacoes
+          .filter(t => t.bancoId === b.id && t.tipo === 'gasto' && !t.cartaoId)
+          .reduce((s, t) => s + t.valor, 0)
+        const entradas = transacoes
+          .filter(t => t.bancoId === b.id && t.tipo === 'entrada')
+          .reduce((s, t) => s + t.valor, 0)
+
+        return { ...b, gastos, entradas, saldoAtual: saldoBase + entradas - gastos }
       }),
-    [bancosRaw, porBanco],
+    [bancosRaw, transacoes, transacoesAnteriores],
   )
 
   async function addBanco(b: BancoInput) {
