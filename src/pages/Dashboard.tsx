@@ -136,11 +136,11 @@ export function Dashboard({ userId }: { userId: string }) {
       setInicializando(true)
       if (!jaExiste) {
         await criarMes(novoMesId, 0)
-      }
-      const mesBase = await encontrarMesAnteriorExistente(mesAnteriorId)
-      if (mesBase) {
-        await copiarContasRecorrentes(mesBase, novoMesId)
-        await propagarFaturasNaoPagas(mesBase, novoMesId)
+        const mesBase = await encontrarMesAnteriorExistente(mesAnteriorId)
+        if (mesBase) {
+          await copiarContasRecorrentes(mesBase, novoMesId)
+          await propagarFaturasNaoPagas(mesBase, novoMesId)
+        }
       }
       await criarTransacoesParaMes(novoMesId)
       return true

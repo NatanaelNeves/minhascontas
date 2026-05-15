@@ -106,7 +106,6 @@ export function useMonth(userId: string): UseMonthReturn {
         const parcelasTotal = data.parcelas?.total ?? 0
         return [
           data.nome ?? '',
-          data.valor ?? 0,
           data.categoria ?? '',
           data.formaPagamento ?? '',
           data.vencimento ?? '',
@@ -128,7 +127,6 @@ export function useMonth(userId: string): UseMonthReturn {
       const vencimentoDestino = atualizarDataParaMes(data.vencimento ?? null, mesDestinoId) ?? ''
       const key = [
         data.nome ?? '',
-        data.valor ?? 0,
         data.categoria ?? '',
         data.formaPagamento ?? '',
         vencimentoDestino,
