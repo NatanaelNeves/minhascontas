@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useBills } from '@/hooks/useBills'
 import { useMonth } from '@/hooks/useMonth'
 import { useTransactions } from '@/hooks/useTransactions'
+import { useTransacoesAnteriores } from '@/hooks/useTransacoesAnteriores'
 import { useBanks } from '@/hooks/useBanks'
 import { useReceivables } from '@/hooks/useReceivables'
 import { useCartoes } from '@/hooks/useCartoes'
@@ -59,7 +60,7 @@ export function Dashboard({ userId }: { userId: string }) {
     deleteTransacao,
   } = useTransactions(userId, mesAtivo)
 
-  const { transacoes: transacoesAnteriores } = useTransactions(userId, prevMesId(mesAtivo))
+  const { transacoes: transacoesAnteriores } = useTransacoesAnteriores(userId, mesAtivo)
 
   const { bancos, addBanco, updateBanco, deleteBanco } = useBanks(
     userId,
