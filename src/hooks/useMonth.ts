@@ -125,12 +125,13 @@ export function useMonth(userId: string): UseMonthReturn {
       if (data.parcelamentoId) continue
       if (data.parcelas && (data.parcelas.atual as number) >= (data.parcelas.total as number)) continue
 
+      const vencimentoDestino = atualizarDataParaMes(data.vencimento ?? null, mesDestinoId) ?? ''
       const key = [
         data.nome ?? '',
         data.valor ?? 0,
         data.categoria ?? '',
         data.formaPagamento ?? '',
-        data.vencimento ?? '',
+        vencimentoDestino,
         data.cartaoId ?? '',
         data.parcelas?.total ?? 0,
       ].join('|')
@@ -145,7 +146,7 @@ export function useMonth(userId: string): UseMonthReturn {
         valor: data.valor,
         categoria: data.categoria,
         formaPagamento: data.formaPagamento,
-        vencimento: atualizarDataParaMes(data.vencimento ?? null, mesDestinoId),
+        vencimento: vencimentoDestino || null,
         parcelas: novaParcelas,
         pago: false,
         recorrente: true,
