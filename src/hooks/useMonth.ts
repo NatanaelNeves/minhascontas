@@ -98,8 +98,23 @@ export function useMonth(userId: string): UseMonthReturn {
 
   async function copiarContasRecorrentes(mesOrigemId: string, mesDestinoId: string) {
     const destCol = collection(db, `users/${userId}/months/${mesDestinoId}/bills`)
-    const jaExistem = await getDocs(query(destCol, where('recorrente', '==', true)))
-    if (!jaExistem.empty) return
+    const existingSnap = await getDocs(query(destCol, where('recorrente', '==', true)))
+    const existingKeys = new Set(
+      existingSnap.docs.map(d => {
+        const data = d.data()
+        const cartaoId = data.cartaoId ?? ''
+        const parcelasTotal = data.parcelas?.total ?? 0
+        return [
+          data.nome ?? '',
+          data.valor ?? 0,
+          data.categoria ?? '',
+          data.formaPagamento ?? '',
+          data.vencimento ?? '',
+          cartaoId,
+          parcelasTotal,
+        ].join('|')
+      }),
+    )
 
     const snap = await getDocs(collection(db, `users/${userId}/months/${mesOrigemId}/bills`))
     const batch = writeBatch(db)
@@ -110,11 +125,22 @@ export function useMonth(userId: string): UseMonthReturn {
       if (data.parcelamentoId) continue
       if (data.parcelas && (data.parcelas.atual as number) >= (data.parcelas.total as number)) continue
 
+      const key = [
+        data.nome ?? '',
+        data.valor ?? 0,
+        data.categoria ?? '',
+        data.formaPagamento ?? '',
+        data.vencimento ?? '',
+        data.cartaoId ?? '',
+        data.parcelas?.total ?? 0,
+      ].join('|')
+      if (existingKeys.has(key)) continue
+
       const novaParcelas = data.parcelas
         ? { atual: (data.parcelas.atual as number) + 1, total: data.parcelas.total as number }
         : null
 
-      batch.set(doc(destCol), {
+      const payload: Record<string, unknown> = {
         nome: data.nome,
         valor: data.valor,
         categoria: data.categoria,
@@ -124,7 +150,9 @@ export function useMonth(userId: string): UseMonthReturn {
         pago: false,
         recorrente: true,
         criadoEm: serverTimestamp(),
-      })
+      }
+      if (data.cartaoId) payload.cartaoId = data.cartaoId
+      batch.set(doc(destCol), payload)
     }
 
     await batch.commit()

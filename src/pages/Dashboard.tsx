@@ -117,24 +117,35 @@ export function Dashboard({ userId }: { userId: string }) {
   const inicializandoRef = useRef(false)
   const prevMesAtivoRef = useRef(mesAtivo)
 
-  async function inicializarMesSeNecessario(novoMesId: string, mesAnteriorId: string) {
-    if (inicializandoRef.current) return
+  async function encontrarMesAnteriorExistente(mesId: string): Promise<string | null> {
+    let current = mesId
+    for (let i = 0; i < 24; i++) {
+      if (await mesExiste(current)) return current
+      current = prevMesId(current)
+    }
+    return null
+  }
+
+  async function inicializarMesSeNecessario(novoMesId: string, mesAnteriorId: string): Promise<boolean> {
+    if (inicializandoRef.current) return false
     inicializandoRef.current = true
 
     try {
       const jaExiste = await mesExiste(novoMesId)
-      if (jaExiste) return
-
       setInicializando(true)
-      await criarMes(novoMesId, 0)
-      const anteriorExiste = await mesExiste(mesAnteriorId)
-      if (anteriorExiste) {
-        await copiarContasRecorrentes(mesAnteriorId, novoMesId)
-        await propagarFaturasNaoPagas(mesAnteriorId, novoMesId)
+      if (!jaExiste) {
+        await criarMes(novoMesId, 0)
+      }
+      const mesBase = await encontrarMesAnteriorExistente(mesAnteriorId)
+      if (mesBase) {
+        await copiarContasRecorrentes(mesBase, novoMesId)
+        await propagarFaturasNaoPagas(mesBase, novoMesId)
       }
       await criarTransacoesParaMes(novoMesId)
+      return true
     } catch (err) {
       console.error('[inicializar mês]', err)
+      return false
     } finally {
       inicializandoRef.current = false
       setInicializando(false)
@@ -147,11 +158,11 @@ export function Dashboard({ userId }: { userId: string }) {
 
     const avancando = mesAtivo >= mesAnterior
     if (!avancando) return
-    if (isMonthLoading || mesInfo !== null) return
+    if (isMonthLoading) return
     if (inicializadoRef.current.has(mesAtivo)) return
-    inicializadoRef.current.add(mesAtivo)
-
-    inicializarMesSeNecessario(mesAtivo, prevMesId(mesAtivo))
+    inicializarMesSeNecessario(mesAtivo, prevMesId(mesAtivo)).then((didInit) => {
+      if (didInit) inicializadoRef.current.add(mesAtivo)
+    })
   }, [mesAtivo, mesInfo, isMonthLoading])
 
   // Clean up orphaned receivable transactions whose receivable was deleted
