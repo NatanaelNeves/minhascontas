@@ -17,6 +17,38 @@ const TIPOS: { value: TipoCartao; label: string }[] = [
 
 const CORES_CARTAO = ['#34c77b', '#a78bfa', '#f59e0b', '#f87171', '#60a5fa', '#e2e8f0']
 
+function DayGrid({ value, onChange }: { value: number; onChange: (d: number) => void }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 5 }}>
+      {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
+        const sel = value === day
+        return (
+          <button
+            key={day}
+            type="button"
+            onClick={() => onChange(day)}
+            style={{
+              padding: '9px 0',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: sel ? 700 : 400,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              transition: 'all .12s',
+              border: sel ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+              background: sel ? 'var(--text-primary)' : 'var(--bg-surface)',
+              color: sel ? 'var(--bg-base)' : 'var(--text-secondary)',
+              textAlign: 'center',
+            }}
+          >
+            {day}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function Label({ children }: { children: React.ReactNode }) {
   return (
     <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 8 }}>
@@ -53,6 +85,7 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
   const [limiteCentStr, setLimiteCentStr] = useState('')
   const [diaFechamento, setDiaFechamento] = useState(1)
   const [diaVencimento, setDiaVencimento] = useState(10)
+  const [gastoAtualCentStr, setGastoAtualCentStr] = useState('')
   const [saldoAtualCentStr, setSaldoAtualCentStr] = useState('')
   const [recargaMensalCentStr, setRecargaMensalCentStr] = useState('')
   const [diaRecarga, setDiaRecarga] = useState<number | ''>('')
@@ -68,6 +101,7 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
         setLimiteCentStr(valorToCentStr(editando.limite))
         setDiaFechamento(editando.diaFechamento)
         setDiaVencimento(editando.diaVencimento)
+        setGastoAtualCentStr(editando.gastoAtual ? valorToCentStr(editando.gastoAtual) : '')
         setSaldoAtualCentStr('')
         setRecargaMensalCentStr('')
         setDiaRecarga('')
@@ -87,6 +121,7 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
       setLimiteCentStr('')
       setDiaFechamento(1)
       setDiaVencimento(10)
+      setGastoAtualCentStr('')
       setSaldoAtualCentStr('')
       setRecargaMensalCentStr('')
       setDiaRecarga('')
@@ -108,6 +143,7 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
   }, [open])
 
   function getCents() { return parseInt(limiteCentStr || '0', 10) }
+  function getGastoCents() { return parseInt(gastoAtualCentStr || '0', 10) }
   function getSaldoCents() { return parseInt(saldoAtualCentStr || '0', 10) }
   function getRecargaCents() { return parseInt(recargaMensalCentStr || '0', 10) }
 
@@ -123,6 +159,7 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
         diaFechamento,
         diaVencimento,
         cor,
+        ...(getGastoCents() > 0 ? { gastoAtual: getGastoCents() / 100 } : {}),
       })
     } else {
       if (getSaldoCents() <= 0) return
@@ -268,35 +305,35 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <div style={{ flex: 1 }}>
-                      <Label>Dia de fechamento</Label>
+                  <div>
+                    <Label>Dia de fechamento</Label>
+                    <DayGrid value={diaFechamento} onChange={setDiaFechamento} />
+                  </div>
+
+                  <div>
+                    <Label>Dia de vencimento</Label>
+                    <DayGrid value={diaVencimento} onChange={setDiaVencimento} />
+                  </div>
+
+                  <div>
+                    <Label>Já gastei neste cartão</Label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 14, fontWeight: 600, color: 'var(--text-tertiary)', pointerEvents: 'none', userSelect: 'none' }}>
+                        R$
+                      </span>
                       <input
-                        type="number"
-                        min={1}
-                        max={31}
-                        value={diaFechamento}
-                        onChange={e => setDiaFechamento(Math.min(31, Math.max(1, Number(e.target.value))))}
-                        placeholder="Fatura fecha todo dia X"
-                        style={{ ...baseInput, textAlign: 'center', fontSize: 18, fontWeight: 700 }}
+                        value={centavosToDisplay(gastoAtualCentStr)}
+                        onChange={e => setGastoAtualCentStr(e.target.value.replace(/\D/g, ''))}
+                        placeholder="0,00"
+                        inputMode="numeric"
+                        style={{ ...baseInput, paddingLeft: 42, fontSize: 18, fontWeight: 700, letterSpacing: '-0.03em', height: 50 }}
                         onFocus={focusInput}
                         onBlur={blurInput}
                       />
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <Label>Dia de vencimento</Label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={31}
-                        value={diaVencimento}
-                        onChange={e => setDiaVencimento(Math.min(31, Math.max(1, Number(e.target.value))))}
-                        placeholder="Fatura vence todo dia X"
-                        style={{ ...baseInput, textAlign: 'center', fontSize: 18, fontWeight: 700 }}
-                        onFocus={focusInput}
-                        onBlur={blurInput}
-                      />
-                    </div>
+                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                      Quanto já tem comprometido hoje. Soma na fatura sem precisar cadastrar conta por conta.
+                    </p>
                   </div>
                 </>
               )}

@@ -57,25 +57,48 @@ export function CartoesList({
     setPagarFaturaId(null)
   }
 
-  const totalLimiteDisponivel = cartoes
-    .reduce((s, c) => s + c.limiteDisponivel, 0)
+  const creditCards = cartoes.filter(c => c.tipo === 'credito')
+  const totalLimite = creditCards.reduce((s, c) => s + (c.tipo === 'credito' ? c.limite : 0), 0)
+  const totalUsado = creditCards.reduce((s, c) => s + c.totalUsado, 0)
+  const totalLimiteDisponivel = creditCards.reduce((s, c) => s + c.limiteDisponivel, 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {cartoes.length > 0 && (
+      {creditCards.length > 0 && (
         <div
           style={{
-            borderRadius: 12, padding: '12px 16px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            borderRadius: 12, padding: '14px 16px',
             background: 'var(--bg-surface)', border: '1px solid var(--border)',
           }}
         >
-          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase' }}>
-            Disponível em cartões
-          </span>
-          <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
-            {formatBRL(totalLimiteDisponivel)}
-          </span>
+          <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 12 }}>
+            Resumo de crédito
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            <div>
+              <p style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 3 }}>Limite total</p>
+              <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+                {formatBRL(totalLimite)}
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 3 }}>Comprometido</p>
+              <p style={{ fontSize: 16, fontWeight: 700, color: totalUsado > 0 ? '#f87171' : 'var(--text-secondary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+                {formatBRL(totalUsado)}
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 3 }}>Disponível</p>
+              <p style={{ fontSize: 16, fontWeight: 700, color: '#34c77b', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+                {formatBRL(totalLimiteDisponivel)}
+              </p>
+            </div>
+          </div>
+          {totalLimite > 0 && (
+            <div style={{ marginTop: 12, height: 4, borderRadius: 99, background: 'var(--bg-elevated)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: 99, background: '#f87171', width: `${Math.min(100, (totalUsado / totalLimite) * 100)}%`, transition: 'width .3s' }} />
+            </div>
+          )}
         </div>
       )}
 

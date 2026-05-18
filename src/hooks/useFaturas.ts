@@ -69,6 +69,7 @@ export function useFaturas(
 
         const totalAvulso = gastosAvulsos.reduce((s, t) => s + t.valor, 0)
         const totalParcelas = contasParceladas.reduce((s, c) => s + c.valor, 0)
+        const gastoAtual = cartao.gastoAtual ?? 0
 
         return {
           cartaoId: cartao.id,
@@ -77,7 +78,8 @@ export function useFaturas(
           diaVencimento: cartao.diaVencimento,
           totalAvulso,
           totalParcelas,
-          total: totalAvulso + totalParcelas,
+          gastoAtual,
+          total: totalAvulso + totalParcelas + gastoAtual,
           gastosAvulsos,
           contasParceladas,
           pago: saved?.pago ?? false,

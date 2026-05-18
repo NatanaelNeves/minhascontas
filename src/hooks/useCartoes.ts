@@ -41,6 +41,7 @@ function docToCartao(snap: QueryDocumentSnapshot<DocumentData>): Cartao {
     limite: typeof d.limite === 'number' ? d.limite : 0,
     diaFechamento: typeof d.diaFechamento === 'number' ? d.diaFechamento : 1,
     diaVencimento: typeof d.diaVencimento === 'number' ? d.diaVencimento : 10,
+    gastoAtual: typeof d.gastoAtual === 'number' ? d.gastoAtual : undefined,
     cor: d.cor,
     criadoEm: d.criadoEm?.toDate() ?? new Date(),
   } satisfies CartaoCredito
@@ -55,6 +56,7 @@ function serializeCartaoInput(c: CartaoInput) {
       diaFechamento: c.diaFechamento,
       diaVencimento: c.diaVencimento,
       cor: c.cor,
+      ...(typeof c.gastoAtual === 'number' && c.gastoAtual > 0 ? { gastoAtual: c.gastoAtual } : {}),
     }
   }
 
@@ -127,6 +129,7 @@ export function useCartoes(userId: string): UseCartoesReturn {
           limite: data.limite,
           diaFechamento: data.diaFechamento,
           diaVencimento: data.diaVencimento,
+          gastoAtual: typeof data.gastoAtual === 'number' && data.gastoAtual > 0 ? data.gastoAtual : deleteField(),
           saldoAtual: deleteField(),
           operadora: deleteField(),
           recargaMensal: deleteField(),
