@@ -116,7 +116,7 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
   const [parcelasTotal, setParcelasTotal] = useState(2)
   const [parcelaAtual, setParcelaAtual] = useState(1)
   const [mesInicio, setMesInicio] = useState('')
-  const [recorrente, setRecorrente] = useState(false)
+  const [recorrente, setRecorrente] = useState(true)
   const [selectedBancoId, setSelectedBancoId] = useState('')
   const [selectedCartaoId, setSelectedCartaoId] = useState('')
   const [dataPagamento, setDataPagamento] = useState(() => new Date().toISOString().split('T')[0])
@@ -165,7 +165,7 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
       setParcelaAtual(1)
       setValorTotalCentStr('')
       setMesInicio('')
-      setRecorrente(false)
+      setRecorrente(true)
       setSelectedBancoId(bancosCorrente[0]?.id ?? '')
       setSelectedCartaoId('')
       setDataPagamento(new Date().toISOString().split('T')[0])
@@ -251,7 +251,7 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
       valor: getCents() / 100,
       parcelas: temParcelas ? { atual: parcelaAtual, total: parcelasTotal } : null,
       ...(cartaoId ? { cartaoId } : {}),
-      recorrente,
+      recorrente: form.categoria === 'fixo' && !temParcelas ? recorrente : false,
     }
     if (temParcelas && parcelasTotal > 1 && !editando && onSaveParcelada) {
       onSaveParcelada(data, parcelasTotal, parcelaAtual)

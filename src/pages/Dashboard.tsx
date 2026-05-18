@@ -23,7 +23,7 @@ import { AbaAtiva, CartaoComSaldo, ContaInput } from '@/types'
 import { prevMesId } from '@/lib/utils'
 import { recargaEmBreve } from '@/lib/cartoes'
 import { db } from '@/lib/firebase'
-import { doc, deleteDoc } from 'firebase/firestore'
+import { doc, deleteDoc, getDocs, collection, query, where, writeBatch } from 'firebase/firestore'
 
 export function Dashboard({ userId }: { userId: string }) {
   const { mesAtivo, abaAtiva, setAbaAtiva } = useAppStore()
@@ -105,7 +105,7 @@ export function Dashboard({ userId }: { userId: string }) {
           }
           return sum + c.valor
         }, 0)
-      const totalUsado = totalDeTx + totalDeContas
+      const totalUsado = totalDeTx + totalDeContas + (cartao.gastoAtual ?? 0)
       const limiteDisponivel = cartao.limite - totalUsado
       const percentualUsado = cartao.limite > 0 ? (totalUsado / cartao.limite) * 100 : 0
       return { ...cartao, totalUsado, limiteDisponivel, percentualUsado, recargaEmBreve: false }
@@ -117,6 +117,7 @@ export function Dashboard({ userId }: { userId: string }) {
   const inicializadoRef = useRef<Set<string>>(new Set())
   const inicializandoRef = useRef(false)
   const prevMesAtivoRef = useRef(mesAtivo)
+  const migracaoRecorrenteRan = useRef(false)
 
   async function encontrarMesAnteriorExistente(mesId: string): Promise<string | null> {
     let current = mesId
@@ -165,6 +166,38 @@ export function Dashboard({ userId }: { userId: string }) {
       if (didInit) inicializadoRef.current.add(mesAtivo)
     })
   }, [mesAtivo, mesInfo, isMonthLoading])
+
+  // One-time migration: set recorrente=true on fixo bills that lack it
+  useEffect(() => {
+    if (!userId || migracaoRecorrenteRan.current) return
+    migracaoRecorrenteRan.current = true
+
+    async function run() {
+      const monthsSnap = await getDocs(collection(db, `users/${userId}/months`))
+      const batch = writeBatch(db)
+      let count = 0
+
+      for (const monthDoc of monthsSnap.docs) {
+        const billsSnap = await getDocs(
+          query(
+            collection(db, `users/${userId}/months/${monthDoc.id}/bills`),
+            where('categoria', '==', 'fixo'),
+          ),
+        )
+        for (const billDoc of billsSnap.docs) {
+          const data = billDoc.data()
+          if (data.recorrente === true) continue
+          if (data.parcelamentoId) continue
+          batch.update(billDoc.ref, { recorrente: true })
+          count++
+        }
+      }
+
+      if (count > 0) await batch.commit()
+    }
+
+    run().catch(console.error)
+  }, [userId])
 
   // Clean up orphaned receivable transactions whose receivable was deleted
   useEffect(() => {

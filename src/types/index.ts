@@ -156,6 +156,7 @@ export interface CartaoCredito extends CartaoBase {
   limite: number
   diaFechamento: number
   diaVencimento: number
+  gastoAtual?: number
   saldoAtual?: never
   operadora?: never
   recargaMensal?: never
@@ -175,7 +176,7 @@ export interface CartaoBeneficio extends CartaoBase {
 
 export type Cartao = CartaoCredito | CartaoBeneficio
 
-export type CartaoInput = Omit<Cartao, 'id' | 'criadoEm'>
+export type CartaoInput = Omit<CartaoCredito, 'id' | 'criadoEm'> | Omit<CartaoBeneficio, 'id' | 'criadoEm'>
 
 export type CartaoComSaldo =
   | (CartaoCredito & {
@@ -220,6 +221,7 @@ export interface FaturaCalculada {
   diaVencimento: number
   totalAvulso: number
   totalParcelas: number
+  gastoAtual: number
   total: number
   gastosAvulsos: Transacao[]
   contasParceladas: Conta[]
