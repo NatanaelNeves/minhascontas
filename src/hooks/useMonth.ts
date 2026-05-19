@@ -9,12 +9,14 @@ import {
   serverTimestamp,
   addDoc,
   deleteDoc,
+  updateDoc,
   query,
   where,
   writeBatch,
+  DocumentData,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { ContaInput, MesInfo } from '@/types'
+import { Conta, ContaInput, MesInfo } from '@/types'
 import { nextMesId, mesIdToShortLabel } from '@/lib/utils'
 import { useAppStore } from '@/store/useAppStore'
 
@@ -39,6 +41,9 @@ interface UseMonthReturn {
     parcelaTotal: number,
     mesAtualId: string,
   ) => Promise<void>
+  atualizarRecorrenteParaMesesFuturos: (mesAtualId: string, contaOriginal: Conta, updates: Partial<ContaInput>) => Promise<void>
+  excluirRecorrenteParaMesesFuturos: (mesAtualId: string, conta: Conta) => Promise<void>
+  sincronizarFaturaPropagada: (mesId: string) => Promise<void>
 }
 
 export function useMonth(userId: string): UseMonthReturn {
@@ -242,9 +247,7 @@ export function useMonth(userId: string): UseMonthReturn {
         if (data.cartaoId === cartaoId && data.tipo === 'gasto') return sum + (data.valor as number)
         return sum
       }, 0)
-      if (totalAvulso <= 0) continue
 
-      // Per-cartaoId query ensures concurrent calls don't bypass dedup via stale snapshot
       const existingSnap = await getDocs(
         query(
           collection(db, `users/${userId}/months/${mesDestinoId}/bills`),
@@ -253,23 +256,115 @@ export function useMonth(userId: string): UseMonthReturn {
           where('cartaoId', '==', cartaoId),
         ),
       )
-      if (!existingSnap.empty) continue
+
+      if (totalAvulso <= 0) {
+        for (const d of existingSnap.docs) {
+          if (!d.data().pago) await deleteDoc(d.ref)
+        }
+        continue
+      }
 
       const mesLabel = mesIdToShortLabel(mesAnteriorId)
-      await addDoc(collection(db, `users/${userId}/months/${mesDestinoId}/bills`), {
-        nome: `Fatura ${cartao.nome} (${mesLabel})`,
-        valor: totalAvulso,
-        categoria: 'cartao',
-        formaPagamento: 'credito',
-        vencimento: null,
-        pago: false,
-        parcelas: null,
-        cartaoId,
-        origem: { tipo: 'fatura_propagada', mesOrigem: mesAnteriorId, cartaoId },
-        criadoEm: serverTimestamp(),
-      })
+
+      if (!existingSnap.empty) {
+        for (const d of existingSnap.docs) {
+          if (!d.data().pago) {
+            await updateDoc(d.ref, { valor: totalAvulso, nome: `Fatura ${cartao.nome} (${mesLabel})` })
+          }
+        }
+      } else {
+        await addDoc(collection(db, `users/${userId}/months/${mesDestinoId}/bills`), {
+          nome: `Fatura ${cartao.nome} (${mesLabel})`,
+          valor: totalAvulso,
+          categoria: 'cartao',
+          formaPagamento: 'credito',
+          vencimento: null,
+          pago: false,
+          parcelas: null,
+          cartaoId,
+          origem: { tipo: 'fatura_propagada', mesOrigem: mesAnteriorId, cartaoId },
+          criadoEm: serverTimestamp(),
+        })
+      }
     }
   }
 
-  return { mesInfo, isLoading, setReceita, criarMes, copiarContasRecorrentes, propagarRecorrenteParaMesesFuturos, mesExiste, propagarFaturasNaoPagas, criarContaComParcelas, excluirParcelamentosRestantes }
+  async function atualizarRecorrenteParaMesesFuturos(
+    mesAtualId: string,
+    contaOriginal: Conta,
+    updates: Partial<ContaInput>,
+  ): Promise<void> {
+    const monthsSnap = await getDocs(collection(db, `users/${userId}/months`))
+    const mesesFuturos = monthsSnap.docs
+      .map(d => d.id)
+      .filter(id => id > mesAtualId)
+      .sort()
+
+    for (const mesFuturo of mesesFuturos) {
+      const billsCol = collection(db, `users/${userId}/months/${mesFuturo}/bills`)
+      const snap = await getDocs(query(billsCol, where('recorrente', '==', true)))
+      const batch = writeBatch(db)
+      let changed = false
+
+      for (const docSnap of snap.docs) {
+        const data = docSnap.data()
+        if (data.parcelamentoId) continue
+        if (data.nome !== contaOriginal.nome) continue
+        if (data.categoria !== contaOriginal.categoria) continue
+
+        const payload: DocumentData = {}
+        if (updates.nome !== undefined) payload.nome = updates.nome
+        if (updates.valor !== undefined) payload.valor = updates.valor
+        if (updates.formaPagamento !== undefined) payload.formaPagamento = updates.formaPagamento
+        if ('vencimento' in updates) payload.vencimento = atualizarDataParaMes(updates.vencimento ?? null, mesFuturo)
+        if (updates.cartaoId !== undefined) payload.cartaoId = updates.cartaoId
+        if (updates.recorrente !== undefined) payload.recorrente = updates.recorrente
+
+        if (Object.keys(payload).length === 0) continue
+        batch.update(docSnap.ref, payload)
+        changed = true
+      }
+
+      if (changed) await batch.commit()
+    }
+  }
+
+  async function excluirRecorrenteParaMesesFuturos(mesAtualId: string, conta: Conta): Promise<void> {
+    const monthsSnap = await getDocs(collection(db, `users/${userId}/months`))
+    const mesesFuturos = monthsSnap.docs
+      .map(d => d.id)
+      .filter(id => id > mesAtualId)
+      .sort()
+
+    for (const mesFuturo of mesesFuturos) {
+      const billsCol = collection(db, `users/${userId}/months/${mesFuturo}/bills`)
+      const snap = await getDocs(query(billsCol, where('recorrente', '==', true)))
+      const batch = writeBatch(db)
+      let changed = false
+
+      for (const docSnap of snap.docs) {
+        const data = docSnap.data()
+        if (data.parcelamentoId) continue
+        if (data.nome !== conta.nome) continue
+        if (data.categoria !== conta.categoria) continue
+        batch.delete(docSnap.ref)
+        changed = true
+      }
+
+      if (changed) await batch.commit()
+    }
+  }
+
+  async function sincronizarFaturaPropagada(mesId: string): Promise<void> {
+    const monthsSnap = await getDocs(collection(db, `users/${userId}/months`))
+    const mesesFuturos = monthsSnap.docs
+      .map(d => d.id)
+      .filter(id => id > mesId)
+      .sort()
+    for (const mesFuturo of mesesFuturos) {
+      await propagarFaturasNaoPagas(mesId, mesFuturo)
+    }
+  }
+
+  return { mesInfo, isLoading, setReceita, criarMes, copiarContasRecorrentes, propagarRecorrenteParaMesesFuturos, mesExiste, propagarFaturasNaoPagas, criarContaComParcelas, excluirParcelamentosRestantes, atualizarRecorrenteParaMesesFuturos, excluirRecorrenteParaMesesFuturos, sincronizarFaturaPropagada }
 }

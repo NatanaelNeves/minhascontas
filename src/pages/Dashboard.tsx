@@ -13,13 +13,14 @@ import { useAppStore } from '@/store/useAppStore'
 import { Header } from '@/components/ui/Header'
 import { BottomNav } from '@/components/BottomNav/BottomNav'
 import { ReceitaModal } from '@/components/Modals/ReceitaModal'
+import { RecorrenteScopeModal } from '@/components/Modals/RecorrenteScopeModal'
 import { HomeTab } from './HomeTab'
 import { ContasTab } from './ContasTab'
 import { GastosTab } from './GastosTab'
 import { BancosTab } from './BancosTab'
 import { ReceberTab } from './ReceberTab'
 import { CartoesTab } from './CartoesTab'
-import { AbaAtiva, CartaoComSaldo, ContaInput } from '@/types'
+import { AbaAtiva, CartaoComSaldo, Conta, ContaInput, TransacaoInput } from '@/types'
 import { prevMesId } from '@/lib/utils'
 import { recargaEmBreve } from '@/lib/cartoes'
 import { db } from '@/lib/firebase'
@@ -39,6 +40,9 @@ export function Dashboard({ userId }: { userId: string }) {
     propagarFaturasNaoPagas,
     criarContaComParcelas,
     excluirParcelamentosRestantes,
+    atualizarRecorrenteParaMesesFuturos,
+    excluirRecorrenteParaMesesFuturos,
+    sincronizarFaturaPropagada,
   } = useMonth(userId)
 
   const {
@@ -113,7 +117,12 @@ export function Dashboard({ userId }: { userId: string }) {
     })
   }, [cartoes, transacoes, contas])
 
+  type PendingPropagacao =
+    | { tipo: 'editar'; conta: Conta; updates: Partial<ContaInput> }
+    | { tipo: 'excluir'; conta: Conta }
+
   const [receitaModalOpen, setReceitaModalOpen] = useState(false)
+  const [pendingPropagacao, setPendingPropagacao] = useState<PendingPropagacao | null>(null)
   const [inicializando, setInicializando] = useState(false)
   const inicializadoRef = useRef<Set<string>>(new Set())
   const inicializandoRef = useRef(false)
@@ -231,6 +240,60 @@ export function Dashboard({ userId }: { userId: string }) {
     await criarContaComParcelas(data, parcelaTotal, mesAtivo, parcelaInicialAtual)
   }
 
+  async function handleUpdateConta(id: string, data: Partial<ContaInput>) {
+    await updateConta(id, data)
+    const conta = contas.find(c => c.id === id)
+    if (conta?.recorrente && !conta.parcelamentoId) {
+      setPendingPropagacao({ tipo: 'editar', conta, updates: data })
+    }
+  }
+
+  async function handleDeleteConta(id: string) {
+    const conta = contas.find(c => c.id === id)
+    await deleteConta(id)
+    if (conta?.recorrente && !conta.parcelamentoId) {
+      setPendingPropagacao({ tipo: 'excluir', conta })
+    }
+  }
+
+  async function handlePropagacaoTodosFuturos() {
+    if (!pendingPropagacao) return
+    if (pendingPropagacao.tipo === 'editar') {
+      const { conta, updates } = pendingPropagacao
+      if (updates.recorrente === false) {
+        await excluirRecorrenteParaMesesFuturos(mesAtivo, conta)
+      } else {
+        await atualizarRecorrenteParaMesesFuturos(mesAtivo, conta, updates)
+      }
+    } else {
+      await excluirRecorrenteParaMesesFuturos(mesAtivo, pendingPropagacao.conta)
+    }
+    setPendingPropagacao(null)
+  }
+
+  async function handleAddTransacao(data: TransacaoInput) {
+    await addTransacao(data)
+    if (data.cartaoId && data.tipo === 'gasto') {
+      await sincronizarFaturaPropagada(mesAtivo)
+    }
+  }
+
+  async function handleUpdateTransacao(id: string, data: Partial<TransacaoInput>) {
+    const tx = transacoes.find(t => t.id === id)
+    await updateTransacao(id, data)
+    if (tx?.cartaoId) {
+      await sincronizarFaturaPropagada(mesAtivo)
+    }
+  }
+
+  async function handleDeleteTransacao(id: string) {
+    const tx = transacoes.find(t => t.id === id)
+    await deleteTransacao(id)
+    if (tx?.cartaoId && tx.tipo === 'gasto') {
+      await sincronizarFaturaPropagada(mesAtivo)
+    }
+  }
+
   async function handleDeleteParcelamento(
     parcelamentoId: string,
     parcelaAtualFrom: number,
@@ -328,9 +391,9 @@ export function Dashboard({ userId }: { userId: string }) {
                 onTogglePago={togglePago}
                 onTogglePagoComBanco={togglePagoComBanco}
                 onDesfazerPagamento={desfazerPagamento}
-                onDelete={deleteConta}
+                onDelete={handleDeleteConta}
                 onAdd={handleAddConta}
-                onUpdate={updateConta}
+                onUpdate={handleUpdateConta}
                 onSaveParcelada={handleSaveParcelada}
                 onDeleteParcelamento={handleDeleteParcelamento}
                 onNavigateToBancos={() => setAbaAtiva('bancos')}
@@ -344,9 +407,9 @@ export function Dashboard({ userId }: { userId: string }) {
                 transacoes={transacoes}
                 bancos={bancos}
                 cartoes={cartoes}
-                onAdd={addTransacao}
-                onUpdate={updateTransacao}
-                onDelete={deleteTransacao}
+                onAdd={handleAddTransacao}
+                onUpdate={handleUpdateTransacao}
+                onDelete={handleDeleteTransacao}
                 onUpdateCartao={updateCartao}
                 onAddRecorrente={addRecorrente}
                 onCancelarRecorrente={cancelarRecorrente}
@@ -425,6 +488,15 @@ export function Dashboard({ userId }: { userId: string }) {
       )}
 
       <BottomNav ativa={abaAtiva} onChange={setAbaAtiva} />
+
+      <RecorrenteScopeModal
+        open={pendingPropagacao !== null}
+        tipo={pendingPropagacao?.tipo ?? 'editar'}
+        nomeConta={pendingPropagacao?.conta.nome ?? ''}
+        onSoEsteMes={() => setPendingPropagacao(null)}
+        onTodosFuturos={handlePropagacaoTodosFuturos}
+        onClose={() => setPendingPropagacao(null)}
+      />
 
       <ReceitaModal
         open={receitaModalOpen}
