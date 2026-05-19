@@ -24,6 +24,7 @@ interface UseMonthReturn {
   setReceita: (valor: number) => Promise<void>
   criarMes: (mesId: string, receita: number) => Promise<void>
   copiarContasRecorrentes: (mesOrigemId: string, mesDestinoId: string) => Promise<void>
+  propagarRecorrenteParaMesesFuturos: (mesOrigemId: string) => Promise<void>
   mesExiste: (mesId: string) => Promise<boolean>
   propagarFaturasNaoPagas: (mesAnteriorId: string, mesDestinoId: string) => Promise<void>
   criarContaComParcelas: (
@@ -157,6 +158,20 @@ export function useMonth(userId: string): UseMonthReturn {
     await batch.commit()
   }
 
+  async function propagarRecorrenteParaMesesFuturos(mesOrigemId: string): Promise<void> {
+    const monthsSnap = await getDocs(collection(db, `users/${userId}/months`))
+    const mesesFuturos = monthsSnap.docs
+      .map(d => d.id)
+      .filter(id => id > mesOrigemId)
+      .sort()
+
+    let anterior = mesOrigemId
+    for (const mesFuturo of mesesFuturos) {
+      await copiarContasRecorrentes(anterior, mesFuturo)
+      anterior = mesFuturo
+    }
+  }
+
   async function criarContaComParcelas(
     conta: ContaInput,
     parcelaTotal: number,
@@ -174,7 +189,7 @@ export function useMonth(userId: string): UseMonthReturn {
         valor: conta.valor,
         categoria: conta.categoria,
         formaPagamento: conta.formaPagamento,
-        vencimento: conta.vencimento ?? null,
+        vencimento: atualizarDataParaMes(conta.vencimento ?? null, currentMes),
         pago: false,
         parcelas: { atual, total: parcelaTotal },
         parcelamentoId,
@@ -256,5 +271,5 @@ export function useMonth(userId: string): UseMonthReturn {
     }
   }
 
-  return { mesInfo, isLoading, setReceita, criarMes, copiarContasRecorrentes, mesExiste, propagarFaturasNaoPagas, criarContaComParcelas, excluirParcelamentosRestantes }
+  return { mesInfo, isLoading, setReceita, criarMes, copiarContasRecorrentes, propagarRecorrenteParaMesesFuturos, mesExiste, propagarFaturasNaoPagas, criarContaComParcelas, excluirParcelamentosRestantes }
 }

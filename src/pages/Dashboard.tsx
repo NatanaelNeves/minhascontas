@@ -34,6 +34,7 @@ export function Dashboard({ userId }: { userId: string }) {
     setReceita,
     criarMes,
     copiarContasRecorrentes,
+    propagarRecorrenteParaMesesFuturos,
     mesExiste,
     propagarFaturasNaoPagas,
     criarContaComParcelas,
@@ -193,7 +194,14 @@ export function Dashboard({ userId }: { userId: string }) {
         }
       }
 
-      if (count > 0) await batch.commit()
+      if (count > 0) {
+        await batch.commit()
+        // Propagate recorrente bills to future initialized months
+        const meses = monthsSnap.docs.map(d => d.id).sort()
+        for (let i = 0; i < meses.length - 1; i++) {
+          await propagarRecorrenteParaMesesFuturos(meses[i])
+        }
+      }
     }
 
     run().catch(console.error)
@@ -210,6 +218,14 @@ export function Dashboard({ userId }: { userId: string }) {
       }
     })
   }, [transacoes, recebiveis, userId, mesAtivo])
+
+  async function handleAddConta(data: ContaInput): Promise<string> {
+    const id = await addConta(data)
+    if (data.recorrente === true) {
+      await propagarRecorrenteParaMesesFuturos(mesAtivo)
+    }
+    return id
+  }
 
   async function handleSaveParcelada(data: ContaInput, parcelaTotal: number, parcelaInicialAtual: number) {
     await criarContaComParcelas(data, parcelaTotal, mesAtivo, parcelaInicialAtual)
@@ -313,7 +329,7 @@ export function Dashboard({ userId }: { userId: string }) {
                 onTogglePagoComBanco={togglePagoComBanco}
                 onDesfazerPagamento={desfazerPagamento}
                 onDelete={deleteConta}
-                onAdd={addConta}
+                onAdd={handleAddConta}
                 onUpdate={updateConta}
                 onSaveParcelada={handleSaveParcelada}
                 onDeleteParcelamento={handleDeleteParcelamento}
