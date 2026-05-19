@@ -337,15 +337,22 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
               <button
                 onClick={onClose}
                 style={{
-                  width: 30, height: 30, borderRadius: 8,
-                  background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'var(--text-tertiary)', transition: 'background .15s',
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--text-tertiary)',
+                  transition: 'background .15s',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-surface)')}
               >
-                <X size={14} />
+                <X size={16} />
               </button>
             </div>
 

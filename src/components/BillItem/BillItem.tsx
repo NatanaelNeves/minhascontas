@@ -57,41 +57,39 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcel
       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.025)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
     >
-      {/* Checkbox toggle */}
+      {/* Checkbox toggle — touch target 36×36, visual 18×18 */}
       <button
         onClick={() => onTogglePago(conta.id, conta.pago)}
-        className="w-[18px] h-[18px] rounded-[5px] flex-shrink-0 flex items-center justify-center transition-all"
-        style={
-          conta.pago
-            ? {
-                background: 'var(--green)',
-                border: '1.5px solid var(--green)',
-              }
-            : {
-                border: '1.5px solid rgba(255,255,255,0.15)',
-                background: 'transparent',
-              }
-        }
+        className="w-9 h-9 flex-shrink-0 flex items-center justify-center"
       >
-        {conta.pago && (
-          <motion.svg
-            initial={{ scale: 0.4, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-            width="9"
-            height="9"
-            viewBox="0 0 9 9"
-            fill="none"
-          >
-            <path
-              d="M1.5 4.5l2 2L7.5 2.5"
-              stroke="white"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </motion.svg>
-        )}
+        <div
+          className="w-[18px] h-[18px] rounded-[5px] flex items-center justify-center transition-all"
+          style={
+            conta.pago
+              ? { background: '#10B981', border: '1.5px solid #10B981' }
+              : { border: '1.5px solid rgba(255,255,255,0.15)', background: 'transparent' }
+          }
+        >
+          {conta.pago && (
+            <motion.svg
+              initial={{ scale: 0.4, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+              width="9"
+              height="9"
+              viewBox="0 0 9 9"
+              fill="none"
+            >
+              <path
+                d="M1.5 4.5l2 2L7.5 2.5"
+                stroke="white"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </motion.svg>
+          )}
+        </div>
       </button>
 
       {/* Emoji avatar */}
@@ -212,22 +210,24 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcel
           >
             <button
               onClick={() => { onDelete(conta.id); setConfirmando(false) }}
-              className="text-[11px] font-medium px-2 py-[3px] rounded-md transition-colors"
+              className="text-[11px] font-medium px-3 py-2 rounded-md transition-colors"
               style={{
                 background: 'var(--red-muted)',
                 color: 'var(--red)',
                 border: '0.5px solid rgba(239,68,68,0.22)',
+                minHeight: 36,
               }}
             >
               Excluir
             </button>
             <button
               onClick={() => setConfirmando(false)}
-              className="text-[11px] font-medium px-2 py-[3px] rounded-md"
+              className="text-[11px] font-medium px-3 py-2 rounded-md"
               style={{
                 background: 'rgba(255,255,255,0.05)',
                 color: 'var(--text-tertiary)',
                 border: '0.5px solid rgba(255,255,255,0.08)',
+                minHeight: 36,
               }}
             >
               Não
@@ -239,7 +239,7 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcel
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex-shrink-0"
+            className="flex items-center gap-0.5 opacity-40 group-hover:opacity-100 transition-opacity ml-1 flex-shrink-0"
           >
             <button
               onClick={() => onEdit(conta)}
@@ -248,7 +248,7 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcel
               onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
               onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
             >
-              <Pencil className="w-[11px] h-[11px]" />
+              <Pencil className="w-3 h-3" />
             </button>
             <button
               onClick={() => {
@@ -263,7 +263,7 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcel
               onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
               onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
             >
-              <Trash2 className="w-[11px] h-[11px]" />
+              <Trash2 className="w-3 h-3" />
             </button>
           </motion.div>
         )}
