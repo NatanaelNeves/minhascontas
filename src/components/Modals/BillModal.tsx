@@ -89,6 +89,85 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   )
 }
 
+function ParcelasStepper({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  onChange: (v: number) => void
+}) {
+  const btnStyle = (disabled: boolean): React.CSSProperties => ({
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    border: '1px solid rgba(255,255,255,0.1)',
+    background: disabled ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.07)',
+    color: disabled ? 'rgba(255,255,255,0.2)' : '#fff',
+    fontSize: 22,
+    fontWeight: 300,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    transition: 'background .15s',
+  })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          color: 'var(--text-subtle)',
+          letterSpacing: '0.09em',
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button
+          type="button"
+          disabled={value <= min}
+          onClick={() => onChange(Math.max(min, value - 1))}
+          style={btnStyle(value <= min)}
+        >
+          −
+        </button>
+        <span
+          style={{
+            minWidth: 36,
+            textAlign: 'center',
+            fontSize: 28,
+            fontWeight: 700,
+            color: '#fff',
+            letterSpacing: '-0.04em',
+          }}
+        >
+          {value}
+        </span>
+        <button
+          type="button"
+          disabled={value >= max}
+          onClick={() => onChange(Math.min(max, value + 1))}
+          style={btnStyle(value >= max)}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const baseInput = {
   width: '100%',
   background: 'rgba(255,255,255,0.04)',
@@ -250,9 +329,9 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
               <button
                 onClick={onClose}
                 style={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: 8,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
                   background: 'rgba(255,255,255,0.06)',
                   border: 'none',
                   cursor: 'pointer',
@@ -265,7 +344,7 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                 onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
               >
-                <X size={14} />
+                <X size={16} />
               </button>
             </div>
 
@@ -448,7 +527,16 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                     Dividido em várias parcelas
                   </p>
                 </div>
-                <Toggle on={temParcelas} onToggle={() => setTemParcelas(v => !v)} />
+                <Toggle
+                  on={temParcelas}
+                  onToggle={() => {
+                    const next = !temParcelas
+                    setTemParcelas(next)
+                    if (next && !form.parcelas) {
+                      setForm(f => ({ ...f, parcelas: { atual: 1, total: 1 } }))
+                    }
+                  }}
+                />
               </div>
 
               <AnimatePresence>
@@ -457,36 +545,41 @@ export function BillModal({ open, onClose, onSave, editando }: Props) {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    style={{ display: 'flex', gap: 12, overflow: 'hidden' }}
+                    style={{ overflow: 'hidden' }}
                   >
-                    <div style={{ flex: 1 }}>
-                      <Label>Parcela atual</Label>
-                      <input
-                        type="number"
-                        min={1}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 16,
+                        padding: '14px 0 2px',
+                      }}
+                    >
+                      <ParcelasStepper
+                        label="Parcela atual"
                         value={form.parcelas?.atual ?? 1}
-                        onChange={e =>
-                          setForm(f => ({
-                            ...f,
-                            parcelas: { atual: Number(e.target.value), total: f.parcelas?.total ?? 1 },
-                          }))
-                        }
-                        style={{ ...baseInput, textAlign: 'center', fontSize: 18, fontWeight: 600 }}
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <Label>Total</Label>
-                      <input
-                        type="number"
                         min={1}
-                        value={form.parcelas?.total ?? 1}
-                        onChange={e =>
+                        max={form.parcelas?.total ?? 1}
+                        onChange={v =>
                           setForm(f => ({
                             ...f,
-                            parcelas: { atual: f.parcelas?.atual ?? 1, total: Number(e.target.value) },
+                            parcelas: { atual: v, total: f.parcelas?.total ?? 1 },
                           }))
                         }
-                        style={{ ...baseInput, textAlign: 'center', fontSize: 18, fontWeight: 600 }}
+                      />
+                      <div style={{ color: 'rgba(255,255,255,0.18)', fontSize: 22, fontWeight: 300, paddingTop: 18 }}>/</div>
+                      <ParcelasStepper
+                        label="Total"
+                        value={form.parcelas?.total ?? 1}
+                        min={form.parcelas?.atual ?? 1}
+                        max={999}
+                        onChange={v =>
+                          setForm(f => ({
+                            ...f,
+                            parcelas: { atual: f.parcelas?.atual ?? 1, total: v },
+                          }))
+                        }
                       />
                     </div>
                   </motion.div>

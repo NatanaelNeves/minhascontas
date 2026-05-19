@@ -6,6 +6,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDocs,
   serverTimestamp,
   QueryDocumentSnapshot,
   DocumentData,
@@ -61,6 +62,32 @@ export function useFirestore(userId: string, mesId: string): UseFirestoreReturn 
     const billsPath = `users/${userId}/months/${mesId}/bills`
     const colRef = collection(db, billsPath)
     await addDoc(colRef, { ...conta, criadoEm: serverTimestamp() })
+
+    if (conta.categoria === 'fixo') {
+      const monthsSnap = await getDocs(collection(db, `users/${userId}/months`))
+      const futureMeses = monthsSnap.docs
+        .map(d => d.id)
+        .filter(id => id > mesId)
+        .sort()
+
+      for (let i = 0; i < futureMeses.length; i++) {
+        const offset = i + 1
+        if (conta.parcelas && conta.parcelas.atual + offset > conta.parcelas.total) continue
+        const novaParcelas = conta.parcelas
+          ? { atual: conta.parcelas.atual + offset, total: conta.parcelas.total }
+          : null
+        await addDoc(collection(db, `users/${userId}/months/${futureMeses[i]}/bills`), {
+          nome: conta.nome,
+          valor: conta.valor,
+          categoria: conta.categoria,
+          formaPagamento: conta.formaPagamento,
+          vencimento: conta.vencimento ?? null,
+          parcelas: novaParcelas,
+          pago: false,
+          criadoEm: serverTimestamp(),
+        })
+      }
+    }
   }
 
   async function updateConta(id: string, data: Partial<ContaInput>) {

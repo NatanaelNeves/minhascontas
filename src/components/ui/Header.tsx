@@ -7,7 +7,7 @@ function ChevronBtn({ onClick, children }: { onClick: () => void; children: Reac
   return (
     <button
       onClick={onClick}
-      className="w-6 h-6 flex items-center justify-center transition-colors rounded-md"
+      className="w-8 h-8 flex items-center justify-center transition-colors rounded-md"
       style={{ color: 'var(--text-subtle)' }}
       onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
       onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-subtle)')}
@@ -94,7 +94,7 @@ export function Header() {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setCurrentPage(currentPage === 'history' ? 'dashboard' : 'history')}
-            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+            className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
             title={currentPage === 'history' ? 'Dashboard' : 'Histórico'}
             style={{ color: 'var(--text-subtle)' }}
             onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-muted)')}
@@ -110,7 +110,7 @@ export function Header() {
             <button
               onClick={logout}
               title="Sair"
-              className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center"
+              className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center"
               style={{ border: '1.5px solid var(--border-medium)' }}
             >
               <img
@@ -124,7 +124,7 @@ export function Header() {
             <button
               onClick={logout}
               title="Sair"
-              className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold text-white"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-semibold text-white"
               style={{
                 background: 'rgba(124,114,216,0.3)',
                 border: '1.5px solid rgba(124,114,216,0.4)',
