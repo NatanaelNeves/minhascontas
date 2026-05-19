@@ -16,7 +16,7 @@ interface Props {
   onAdd: (data: CartaoInput) => void
   onUpdate: (id: string, data: Partial<CartaoInput>) => void
   onDelete: (id: string) => void
-  onMarcarFaturaPaga: (faturaId: string, bancoId: string, dataPagamento: string) => void
+  onMarcarFaturaPaga: (faturaId: string, bancoId: string, dataPagamento: string, valorCustom?: number) => void
   onCancelarRecorrente: (id: string) => Promise<void>
   onNavigateToBancos: () => void
 }
@@ -52,8 +52,8 @@ export function CartoesList({
     setEditando(null)
   }
 
-  function handleBancoSelect(bancoId: string, dataPagamento: string) {
-    if (pagarFaturaId) onMarcarFaturaPaga(pagarFaturaId, bancoId, dataPagamento)
+  function handleBancoSelect(bancoId: string, dataPagamento: string, valor?: number) {
+    if (pagarFaturaId) onMarcarFaturaPaga(pagarFaturaId, bancoId, dataPagamento, valor)
     setPagarFaturaId(null)
   }
 
@@ -147,6 +147,7 @@ export function CartoesList({
       <SelectBancoModal
         open={pagarFaturaId !== null}
         bancos={bancos}
+        valorInicial={faturas.find(f => f.cartaoId === pagarFaturaId)?.total}
         onSelect={handleBancoSelect}
         onClose={() => setPagarFaturaId(null)}
         onNavigateToBancos={onNavigateToBancos}

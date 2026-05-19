@@ -30,7 +30,7 @@ interface Props {
   onDeleteParcelamento?: (parcelamentoId: string, parcelaAtualFrom: number, parcelaTotal: number) => Promise<void>
   onNavigateToBancos: () => void
   onNavigateToCartoes: () => void
-  onMarcarFaturaPaga: (cartaoId: string, bancoId: string, dataPagamento: string) => Promise<void>
+  onMarcarFaturaPaga: (cartaoId: string, bancoId: string, dataPagamento: string, valorCustom?: number) => Promise<void>
   onDesmarcarFaturaPaga: (cartaoId: string) => Promise<void>
 }
 
@@ -93,9 +93,9 @@ export function ContasTab({
     setPendingToggleId(null)
   }
 
-  function handleFaturaBancoSelect(bancoId: string, dataPagamento: string) {
+  function handleFaturaBancoSelect(bancoId: string, dataPagamento: string, valor?: number) {
     if (!pendingFaturaCartaoId) return
-    onMarcarFaturaPaga(pendingFaturaCartaoId, bancoId, dataPagamento)
+    onMarcarFaturaPaga(pendingFaturaCartaoId, bancoId, dataPagamento, valor)
     setPendingFaturaCartaoId(null)
   }
 
@@ -361,6 +361,7 @@ export function ContasTab({
       <SelectBancoModal
         open={pendingFaturaCartaoId !== null}
         bancos={bancos}
+        valorInicial={faturas.find(f => f.cartaoId === pendingFaturaCartaoId)?.total}
         onSelect={handleFaturaBancoSelect}
         onClose={() => setPendingFaturaCartaoId(null)}
         onNavigateToBancos={onNavigateToBancos}

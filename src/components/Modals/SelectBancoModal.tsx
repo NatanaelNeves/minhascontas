@@ -1,22 +1,27 @@
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { BancoComSaldo } from '@/types'
-import { formatBRL } from '@/lib/utils'
+import { formatBRL, centavosToDisplay } from '@/lib/utils'
 
 interface Props {
   open: boolean
   bancos: BancoComSaldo[]
-  onSelect: (bancoId: string, data: string) => void
+  valorInicial?: number
+  onSelect: (bancoId: string, data: string, valor?: number) => void
   onClose: () => void
   onNavigateToBancos?: () => void
 }
 
-export function SelectBancoModal({ open, bancos, onSelect, onClose, onNavigateToBancos }: Props) {
+export function SelectBancoModal({ open, bancos, valorInicial, onSelect, onClose, onNavigateToBancos }: Props) {
   const [data, setData] = useState(() => new Date().toISOString().split('T')[0])
+  const [valorCents, setValorCents] = useState(0)
 
   useEffect(() => {
-    if (open) setData(new Date().toISOString().split('T')[0])
-  }, [open])
+    if (open) {
+      setData(new Date().toISOString().split('T')[0])
+      setValorCents(valorInicial !== undefined ? Math.round(valorInicial * 100) : 0)
+    }
+  }, [open, valorInicial])
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -27,6 +32,34 @@ export function SelectBancoModal({ open, bancos, onSelect, onClose, onNavigateTo
         <DialogHeader>
           <DialogTitle style={{ color: 'var(--text-primary)' }}>Selecionar banco</DialogTitle>
         </DialogHeader>
+
+        {valorInicial !== undefined && (
+          <div>
+            <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 8 }}>
+              Valor a pagar
+            </p>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={centavosToDisplay(valorCents.toString())}
+              onChange={e => {
+                const raw = e.target.value.replace(/\D/g, '')
+                setValorCents(parseInt(raw || '0', 10))
+              }}
+              style={{
+                width: '100%',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: '9px 12px',
+                fontSize: 14,
+                color: 'var(--text-primary)',
+                outline: 'none',
+                fontFamily: 'inherit',
+              }}
+            />
+          </div>
+        )}
 
         <div>
           <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 8 }}>
@@ -71,7 +104,7 @@ export function SelectBancoModal({ open, bancos, onSelect, onClose, onNavigateTo
             {bancos.map(b => (
               <li key={b.id}>
                 <button
-                  onClick={() => onSelect(b.id, data)}
+                  onClick={() => onSelect(b.id, data, valorInicial !== undefined ? valorCents / 100 : undefined)}
                   className="w-full flex items-center justify-between rounded-lg px-4 py-3 text-left transition-colors"
                   style={{
                     background: 'var(--bg-surface)',

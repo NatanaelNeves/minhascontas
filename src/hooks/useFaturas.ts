@@ -21,7 +21,7 @@ interface FaturaFirestore {
 export interface UseFaturasReturn {
   faturas: FaturaCalculada[]
   isLoading: boolean
-  marcarFaturaPaga: (cartaoId: string, bancoId: string, dataPagamento: string) => Promise<void>
+  marcarFaturaPaga: (cartaoId: string, bancoId: string, dataPagamento: string, valorCustom?: number) => Promise<void>
   desmarcarFaturaPaga: (cartaoId: string) => Promise<void>
 }
 
@@ -91,10 +91,11 @@ export function useFaturas(
       .filter(f => f.total > 0)
   }, [cartoes, transacoes, contas, faturasSalvas])
 
-  async function marcarFaturaPaga(cartaoId: string, bancoId: string, dataPagamento: string) {
+  async function marcarFaturaPaga(cartaoId: string, bancoId: string, dataPagamento: string, valorCustom?: number) {
     const fatura = faturas.find(f => f.cartaoId === cartaoId)
     if (!fatura) return
 
+    const valorFinal = valorCustom ?? fatura.total
     const batch = writeBatch(db)
 
     // Single payment transaction (no cartaoId → bank balance decreases)
@@ -103,7 +104,7 @@ export function useFaturas(
       tipo: 'gasto',
       categoria: 'despesaFixa',
       bancoId,
-      valor: fatura.total,
+      valor: valorFinal,
       descricao: `Fatura ${fatura.cartaoNome}`,
       data: dataPagamento,
       despesaFixa: false,
