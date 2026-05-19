@@ -87,6 +87,76 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   )
 }
 
+function Stepper({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  onChange: (v: number) => void
+}) {
+  const atMin = value <= min
+  const atMax = value >= max
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+      <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase' }}>
+        {label}
+      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(min, value - 1))}
+          disabled={atMin}
+          style={{
+            width: 52, height: 52, border: 'none', background: 'transparent',
+            color: atMin ? 'rgba(255,255,255,0.15)' : 'var(--text-primary)',
+            fontSize: 24, fontWeight: 300, cursor: atMin ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            borderRight: '1px solid var(--border)', flexShrink: 0,
+            WebkitTapHighlightColor: 'transparent',
+          }}
+          onPointerDown={e => { if (!atMin) (e.currentTarget.style.background = 'rgba(255,255,255,0.06)') }}
+          onPointerUp={e => { (e.currentTarget.style.background = 'transparent') }}
+          onPointerLeave={e => { (e.currentTarget.style.background = 'transparent') }}
+        >
+          −
+        </button>
+        <span style={{
+          minWidth: 48, textAlign: 'center',
+          fontSize: 22, fontWeight: 700, color: '#fff',
+          letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums',
+          padding: '0 4px',
+        }}>
+          {value}
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(Math.min(max, value + 1))}
+          disabled={atMax}
+          style={{
+            width: 52, height: 52, border: 'none', background: 'transparent',
+            color: atMax ? 'rgba(255,255,255,0.15)' : 'var(--text-primary)',
+            fontSize: 24, fontWeight: 300, cursor: atMax ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            borderLeft: '1px solid var(--border)', flexShrink: 0,
+            WebkitTapHighlightColor: 'transparent',
+          }}
+          onPointerDown={e => { if (!atMax) (e.currentTarget.style.background = 'rgba(255,255,255,0.06)') }}
+          onPointerUp={e => { (e.currentTarget.style.background = 'transparent') }}
+          onPointerLeave={e => { (e.currentTarget.style.background = 'transparent') }}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const baseInput = {
   width: '100%',
   background: 'var(--bg-surface)',
@@ -594,29 +664,22 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
                           </div>
                         )}
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                          <div>
-                            <Label>Nº de parcelas</Label>
-                            <input
-                              type="number"
-                              min={2}
-                              max={480}
-                              value={parcelasTotal}
-                              onChange={e => setParcelasTotal(Math.max(2, Number(e.target.value)))}
-                              style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
-                            />
-                          </div>
-                          <div>
-                            <Label>Parcela atual</Label>
-                            <input
-                              type="number"
-                              min={1}
-                              max={parcelasTotal}
-                              value={parcelaAtual}
-                              onChange={e => setParcelaAtual(Math.min(parcelasTotal, Math.max(1, Number(e.target.value))))}
-                              style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
-                            />
-                          </div>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 12 }}>
+                          <Stepper
+                            label="Parcela atual"
+                            value={parcelaAtual}
+                            min={1}
+                            max={parcelasTotal}
+                            onChange={setParcelaAtual}
+                          />
+                          <span style={{ fontSize: 20, color: 'rgba(255,255,255,0.2)', fontWeight: 300, paddingBottom: 14 }}>/</span>
+                          <Stepper
+                            label="Total de parcelas"
+                            value={parcelasTotal}
+                            min={Math.max(2, parcelaAtual)}
+                            max={480}
+                            onChange={setParcelasTotal}
+                          />
                         </div>
 
                         {getCents() > 0 && parcelasTotal >= 2 && (
@@ -686,29 +749,22 @@ export function BillModal({ open, onClose, onSave, onSaveParcelada, editando, ca
                           </div>
                         )}
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                          <div>
-                            <Label>Nº de parcelas</Label>
-                            <input
-                              type="number"
-                              min={2}
-                              max={120}
-                              value={parcelasTotal}
-                              onChange={e => setParcelasTotal(Math.max(2, Number(e.target.value)))}
-                              style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
-                            />
-                          </div>
-                          <div>
-                            <Label>Parcela atual</Label>
-                            <input
-                              type="number"
-                              min={1}
-                              max={parcelasTotal}
-                              value={parcelaAtual}
-                              onChange={e => setParcelaAtual(Math.min(parcelasTotal, Math.max(1, Number(e.target.value))))}
-                              style={{ ...baseInput, textAlign: 'center', fontSize: 20, fontWeight: 700 }}
-                            />
-                          </div>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 12 }}>
+                          <Stepper
+                            label="Parcela atual"
+                            value={parcelaAtual}
+                            min={1}
+                            max={parcelasTotal}
+                            onChange={setParcelaAtual}
+                          />
+                          <span style={{ fontSize: 20, color: 'rgba(255,255,255,0.2)', fontWeight: 300, paddingBottom: 14 }}>/</span>
+                          <Stepper
+                            label="Total de parcelas"
+                            value={parcelasTotal}
+                            min={Math.max(2, parcelaAtual)}
+                            max={120}
+                            onChange={setParcelasTotal}
+                          />
                         </div>
 
                         {getValorTotalCents() > 0 && parcelasTotal >= 2 && (
