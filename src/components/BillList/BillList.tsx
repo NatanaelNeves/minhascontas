@@ -8,7 +8,9 @@ interface Props {
   onTogglePago: (id: string, pago: boolean) => void
   onEdit: (conta: Conta) => void
   onDelete: (id: string) => void
+  onDeleteParcelamento?: (parcelamentoId: string, parcelaAtualFrom: number, parcelaTotal: number) => void
   onAdd: () => void
+  cartaoCores?: Record<string, string>
 }
 
 const CATEGORIAS = [
@@ -17,7 +19,17 @@ const CATEGORIAS = [
   { key: 'extra' as const, label: 'Extras do mês' },
 ]
 
-export function BillList({ contas, onTogglePago, onEdit, onDelete, onAdd }: Props) {
+function sortContas(contas: Conta[]): Conta[] {
+  return [...contas].sort((a, b) => {
+    if (a.pago !== b.pago) return a.pago ? 1 : -1
+    if (!a.vencimento && !b.vencimento) return 0
+    if (!a.vencimento) return 1
+    if (!b.vencimento) return -1
+    return a.vencimento.localeCompare(b.vencimento)
+  })
+}
+
+export function BillList({ contas, onTogglePago, onEdit, onDelete, onDeleteParcelamento, onAdd, cartaoCores }: Props) {
   if (contas.length === 0) {
     return (
       <motion.div
@@ -26,23 +38,23 @@ export function BillList({ contas, onTogglePago, onEdit, onDelete, onAdd }: Prop
         className="flex flex-col items-center justify-center py-16 text-center space-y-5"
       >
         <div
-          className="w-16 h-16 rounded-[18px] flex items-center justify-center text-3xl"
-          style={{ background: 'rgba(127,119,221,0.1)', border: '0.5px solid rgba(127,119,221,0.15)' }}
+          className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+          style={{ background: 'var(--bg-elevated)' }}
         >
           📋
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <p className="font-medium text-[15px]" style={{ color: 'var(--text-primary)' }}>Nenhuma conta cadastrada</p>
-          <p className="text-[13px] max-w-[220px] mx-auto leading-relaxed" style={{ color: 'var(--text-subtle)' }}>
+          <p className="text-[13px] max-w-[220px] mx-auto leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
             Registre suas despesas e acompanhe o que falta pagar
           </p>
         </div>
         <button
           onClick={onAdd}
-          className="flex items-center gap-2 px-5 h-10 rounded-[14px] text-[14px] font-medium text-white transition-opacity hover:opacity-80"
+          className="flex items-center gap-2 px-5 h-10 rounded-full text-[14px] font-medium transition-opacity hover:opacity-80"
           style={{
-            background: 'linear-gradient(135deg, #7F77DD, #534AB7)',
-            boxShadow: '0 6px 24px rgba(127,119,221,0.3)',
+            background: 'var(--text-primary)',
+            color: 'var(--bg-base)',
           }}
         >
           + Adicionar primeira conta
@@ -54,7 +66,7 @@ export function BillList({ contas, onTogglePago, onEdit, onDelete, onAdd }: Prop
   return (
     <div className="space-y-4">
       {CATEGORIAS.map(({ key, label }) => {
-        const grupo = contas.filter(c => c.categoria === key)
+        const grupo = sortContas(contas.filter(c => c.categoria === key))
         if (grupo.length === 0) return null
 
         const totalGrupo = grupo.reduce((sum, c) => sum + c.valor, 0)
@@ -70,18 +82,18 @@ export function BillList({ contas, onTogglePago, onEdit, onDelete, onAdd }: Prop
               <div className="flex items-center gap-2">
                 <span
                   className="text-[11px] font-medium uppercase"
-                  style={{ color: 'var(--text-muted)', letterSpacing: '0.08em' }}
+                  style={{ color: 'var(--text-secondary)', letterSpacing: '0.08em' }}
                 >
                   {label}
                 </span>
                 <span
                   className="text-[10px] px-2 py-[2px] rounded-full"
-                  style={{ background: 'var(--glass-bg)', color: 'var(--text-muted)' }}
+                  style={{ background: 'var(--bg-elevated)', color: 'var(--text-tertiary)' }}
                 >
                   {grupo.length}
                 </span>
               </div>
-              <span className="text-[13px] font-medium" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-[13px] font-medium" style={{ color: 'var(--text-secondary)' }}>
                 {formatBRL(totalGrupo)}
               </span>
             </div>
@@ -102,6 +114,8 @@ export function BillList({ contas, onTogglePago, onEdit, onDelete, onAdd }: Prop
                     onTogglePago={onTogglePago}
                     onEdit={onEdit}
                     onDelete={onDelete}
+                    onDeleteParcelamento={onDeleteParcelamento}
+                    cartaoCor={cartaoCores?.[conta.cartaoId ?? '']}
                   />
                 ))}
               </AnimatePresence>

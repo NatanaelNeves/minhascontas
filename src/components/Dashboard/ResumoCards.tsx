@@ -1,187 +1,52 @@
 import { motion } from 'framer-motion'
 import { ResumoMes } from '@/types'
-import { formatBRL, formatBRLShort } from '@/lib/utils'
+import { formatBRLShort } from '@/lib/utils'
 
 interface Props {
   resumo: ResumoMes
-  receita: number
   semContas: boolean
-  onEditReceita?: () => void
+  nPagas: number
+  nTotal: number
 }
 
-const SAUDE = {
-  verde: {
-    label: 'Mês tranquilo',
-    bg: 'rgba(16,185,129,0.1)',
-    border: 'rgba(16,185,129,0.25)',
-    dot: '#10B981',
-    dotClass: 'pulse-dot',
-    text: '#10B981',
-  },
-  amarelo: {
-    label: 'Atenção',
-    bg: 'rgba(245,158,11,0.1)',
-    border: 'rgba(245,158,11,0.25)',
-    dot: '#F59E0B',
-    dotClass: 'pulse-dot-amber',
-    text: '#F59E0B',
-  },
-  vermelho: {
-    label: 'Mês crítico',
-    bg: 'rgba(239,68,68,0.1)',
-    border: 'rgba(239,68,68,0.25)',
-    dot: '#EF4444',
-    dotClass: 'pulse-dot-red',
-    text: '#EF4444',
-  },
-}
-
-const METRICS = (resumo: ResumoMes) => [
-  { label: 'Total', value: resumo.totalGeral, color: '#ffffff' },
-  { label: 'Pago', value: resumo.totalPago, color: '#10B981' },
-  { label: 'Pendente', value: resumo.totalPendente, color: '#F59E0B' },
-  { label: 'Sobra', value: resumo.sobra, color: '#7C72D8' },
-]
-
-export function ResumoCards({ resumo, receita, semContas, onEditReceita }: Props) {
-  const saude = SAUDE[resumo.saudePrimaria]
+export function ResumoCards({ resumo, semContas, nPagas, nTotal }: Props) {
+  if (semContas) return null
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35 }}
-      className="rounded-[16px] overflow-hidden"
+    <div
       style={{
-        background: 'var(--surface)',
-        border: '0.5px solid var(--border-subtle)',
+        background: 'var(--bg-surface)',
+        border: '0.5px solid var(--border)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '14px 20px',
       }}
     >
-      {/* Receita */}
-      <div
-        style={{
-          padding: '20px 22px',
-          borderBottom: '0.5px solid var(--divider)',
-        }}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p
-              className="text-[10px] font-semibold uppercase mb-1.5"
-              style={{ color: 'var(--text-subtle)', letterSpacing: '0.1em' }}
-            >
-              Receita do mês
-            </p>
-            <p
-              className="leading-none tabular-nums"
-              style={{
-                fontSize: 34,
-                fontWeight: 700,
-                color: '#ffffff',
-                letterSpacing: '-0.05em',
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {receita > 0 ? formatBRL(receita) : '—'}
-            </p>
-            <button
-              onClick={onEditReceita}
-              className="mt-2 flex items-center gap-1 transition-colors"
-              style={{ color: 'var(--text-subtle)' }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-muted)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-subtle)')}
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M1.5 8.5h7M6.5 1.5L8.5 3.5 4 8 2 8.5l.5-2 4-4z" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.01em' }}>
-                {receita > 0 ? 'Editar receita' : 'Definir receita'}
-              </span>
-            </button>
-          </div>
-
-          {!semContas && (
-            <div
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full shrink-0"
-              style={{
-                background: saude.bg,
-                border: `0.5px solid ${saude.border}`,
-              }}
-            >
-              <div
-                className={`w-[7px] h-[7px] rounded-full shrink-0 ${saude.dotClass}`}
-                style={{ background: saude.dot }}
-              />
-              <span className="text-[11px] font-medium" style={{ color: saude.text }}>
-                {saude.label}
-              </span>
-            </div>
-          )}
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <p style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+          Contas pagas
+        </p>
+        <p style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+          {nPagas}/{nTotal}
+        </p>
       </div>
 
-      {/* Progress */}
-      {!semContas && (
-        <div
-          style={{
-            padding: '14px 22px',
-            borderBottom: '0.5px solid var(--divider)',
-          }}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <p
-              className="text-[10px] font-semibold uppercase"
-              style={{ color: 'var(--text-subtle)', letterSpacing: '0.08em' }}
-            >
-              Progresso
-            </p>
-            <p
-              className="text-[12px] font-medium tabular-nums"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              {resumo.percentualPago.toFixed(0)}% pago
-            </p>
-          </div>
-          <div
-            className="h-[3px] rounded-full overflow-hidden"
-            style={{ background: 'rgba(255,255,255,0.07)' }}
-          >
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min(resumo.percentualPago, 100)}%` }}
-              transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
-              className="h-full rounded-full"
-              style={{ background: 'linear-gradient(90deg, #10B981, #7C72D8)' }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* 4 metrics — horizontal strip with dividers */}
-      <div className="grid grid-cols-4">
-        {METRICS(resumo).map(({ label, value, color }, i) => (
-          <div
-            key={label}
-            style={{
-              padding: '14px 14px 16px',
-              borderLeft: i > 0 ? '0.5px solid var(--divider)' : 'none',
-            }}
-          >
-            <p
-              className="text-[9px] font-semibold uppercase mb-1.5"
-              style={{ color: 'var(--text-subtle)', letterSpacing: '0.1em' }}
-            >
-              {label}
-            </p>
-            <p
-              className="text-[14px] font-semibold tabular-nums"
-              style={{ color, letterSpacing: '-0.03em' }}
-            >
-              {formatBRLShort(value)}
-            </p>
-          </div>
-        ))}
+      <div style={{ height: 3, borderRadius: 99, overflow: 'hidden', background: 'rgba(255,255,255,0.07)', marginBottom: 8 }}>
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.min(resumo.percentualPago, 100)}%` }}
+          transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
+          style={{ height: '100%', borderRadius: 99, background: 'var(--green)' }}
+        />
       </div>
-    </motion.div>
+
+      <p style={{ fontSize: 11, color: 'var(--text-tertiary)', letterSpacing: '-0.01em' }}>
+        {nPagas} de {nTotal} {nTotal === 1 ? 'conta paga' : 'contas pagas'}
+        {resumo.totalPendente > 0 && (
+          <span style={{ color: 'var(--amber)' }}>
+            {' · '}{formatBRLShort(resumo.totalPendente)} pendente
+          </span>
+        )}
+      </p>
+    </div>
   )
 }

@@ -6,6 +6,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function centavosToDisplay(centStr: string): string {
+  if (!centStr) return ''
+  const cents = parseInt(centStr, 10)
+  if (isNaN(cents)) return ''
+  return (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+export function valorToCentStr(valor: number): string {
+  return Math.round(valor * 100).toString()
+}
+
 export function formatBRL(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -118,4 +129,23 @@ export function getAlertaVencimento(
   if (diffDias <= 0) return 'vencida'
   if (diffDias <= 3) return 'vence_em_breve'
   return null
+}
+
+const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+
+export function mesIdToShortLabel(mesId: string): string {
+  const [year, month] = mesId.split('-').map(Number)
+  return `${MESES_CURTOS[month - 1]}/${year}`
+}
+
+export function mesIdAddMeses(mesId: string, n: number): string {
+  const [year, month] = mesId.split('-').map(Number)
+  const d = new Date(year, month - 1 + n, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+export function mesesEntreMesIds(de: string, ate: string): number {
+  const [y1, m1] = de.split('-').map(Number)
+  const [y2, m2] = ate.split('-').map(Number)
+  return (y2 - y1) * 12 + (m2 - m1)
 }

@@ -8,9 +8,9 @@ function ChevronBtn({ onClick, children }: { onClick: () => void; children: Reac
     <button
       onClick={onClick}
       className="w-6 h-6 flex items-center justify-center transition-colors rounded-md"
-      style={{ color: 'var(--text-subtle)' }}
+      style={{ color: 'var(--text-tertiary)' }}
       onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
-      onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-subtle)')}
+      onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
     >
       {children}
     </button>
@@ -19,17 +19,17 @@ function ChevronBtn({ onClick, children }: { onClick: () => void; children: Reac
 
 export function Header() {
   const { user, logout } = useAuth()
-  const { mesAtivo, setMesAtivo, currentPage, setCurrentPage } = useAppStore()
+  const { mesAtivo, setMesAtivo, currentPage, setCurrentPage, abaAtiva } = useAppStore()
 
   return (
     <header
       className="sticky top-0 z-20 backdrop-blur-xl"
       style={{
         background: 'var(--header-bg)',
-        borderBottom: '0.5px solid var(--border-subtle)',
+        borderBottom: '0.5px solid var(--border)',
       }}
     >
-      <div className="max-w-2xl mx-auto px-5 h-[52px] flex items-center justify-between gap-3">
+      <div className="max-w-[480px] mx-auto px-4 h-[52px] flex items-center justify-between gap-3 w-full">
 
         {/* Logo */}
         <button
@@ -39,7 +39,7 @@ export function Header() {
           <div
             className="w-[28px] h-[28px] rounded-[8px] flex items-center justify-center shrink-0"
             style={{
-              background: '#ffffff',
+              background: 'var(--text-primary)',
             }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -61,7 +61,7 @@ export function Header() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
             style={{
               background: 'var(--glass-bg)',
-              border: '0.5px solid var(--border-medium)',
+              border: '0.5px solid var(--border-strong)',
             }}
           >
             <ChevronBtn onClick={() => setMesAtivo(prevMesId(mesAtivo))}>
@@ -90,15 +90,32 @@ export function Header() {
           </span>
         )}
 
-        {/* Right — history + avatar */}
+        {/* Right — pdf + history + avatar */}
         <div className="flex items-center gap-2 shrink-0">
+          {currentPage === 'dashboard' && abaAtiva === 'home' && (
+            <button
+              onClick={() => document.dispatchEvent(new CustomEvent('export-pdf'))}
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+              title="Exportar PDF"
+              style={{ color: 'var(--text-tertiary)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="2" y="1" width="7" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+                <path d="M5 4h3M5 6.5h3M5 9h1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+                <path d="M9 9l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                <circle cx="11" cy="12" r="1.5" fill="currentColor" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={() => setCurrentPage(currentPage === 'history' ? 'dashboard' : 'history')}
-            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+            className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
             title={currentPage === 'history' ? 'Dashboard' : 'Histórico'}
-            style={{ color: 'var(--text-subtle)' }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-muted)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-subtle)')}
+            style={{ color: 'var(--text-tertiary)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.2" />
@@ -110,7 +127,7 @@ export function Header() {
             <button
               onClick={logout}
               title="Sair"
-              className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center"
+              className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center"
               style={{ border: '1.5px solid var(--border-medium)' }}
             >
               <img
@@ -124,7 +141,7 @@ export function Header() {
             <button
               onClick={logout}
               title="Sair"
-              className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold text-white"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-semibold text-white"
               style={{
                 background: 'rgba(124,114,216,0.3)',
                 border: '1.5px solid rgba(124,114,216,0.4)',

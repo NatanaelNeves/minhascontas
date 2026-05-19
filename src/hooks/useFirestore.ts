@@ -24,6 +24,11 @@ function docToConta(snapshot: QueryDocumentSnapshot<DocumentData>): Conta {
     vencimento: data.vencimento ?? null,
     pago: data.pago,
     parcelas: data.parcelas ?? null,
+    parcelamentoId: data.parcelamentoId ?? undefined,
+    cartaoId: data.cartaoId ?? undefined,
+    pagamento: data.pagamento ?? undefined,
+    recorrente: data.recorrente ?? undefined,
+    origem: data.origem ?? undefined,
     criadoEm: data.criadoEm?.toDate() ?? new Date(),
   }
 }
@@ -31,7 +36,7 @@ function docToConta(snapshot: QueryDocumentSnapshot<DocumentData>): Conta {
 interface UseFirestoreReturn {
   contas: Conta[]
   isLoading: boolean
-  addConta: (conta: ContaInput) => Promise<void>
+  addConta: (conta: ContaInput) => Promise<string>
   updateConta: (id: string, data: Partial<ContaInput>) => Promise<void>
   deleteConta: (id: string) => Promise<void>
 }
@@ -57,10 +62,11 @@ export function useFirestore(userId: string, mesId: string): UseFirestoreReturn 
     return unsubscribe
   }, [userId, mesId])
 
-  async function addConta(conta: ContaInput) {
+  async function addConta(conta: ContaInput): Promise<string> {
     const billsPath = `users/${userId}/months/${mesId}/bills`
     const colRef = collection(db, billsPath)
-    await addDoc(colRef, { ...conta, criadoEm: serverTimestamp() })
+    const ref = await addDoc(colRef, { ...conta, criadoEm: serverTimestamp() })
+    return ref.id
   }
 
   async function updateConta(id: string, data: Partial<ContaInput>) {

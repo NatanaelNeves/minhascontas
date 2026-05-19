@@ -2,13 +2,17 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pencil, Trash2 } from 'lucide-react'
 import { Conta } from '@/types'
-import { formatBRL, getAlertaVencimento, getBillEmoji, getBillAvatarBg } from '@/lib/utils'
+import { formatBRL, getAlertaVencimento, getBillEmoji, getBillAvatarBg, mesIdAddMeses, mesIdToShortLabel } from '@/lib/utils'
+import { useAppStore } from '@/store/useAppStore'
+import { ConfirmDeleteParcelaModal } from '@/components/Modals/ConfirmDeleteParcelaModal'
 
 interface Props {
   conta: Conta
   onTogglePago: (id: string, pago: boolean) => void
   onEdit: (conta: Conta) => void
   onDelete: (id: string) => void
+  onDeleteParcelamento?: (parcelamentoId: string, parcelaAtualFrom: number, parcelaTotal: number) => void
+  cartaoCor?: string
 }
 
 const FORMA_LABEL: Record<string, string> = {
@@ -18,11 +22,23 @@ const FORMA_LABEL: Record<string, string> = {
   credito: 'Crédito',
 }
 
-export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
+export function BillItem({ conta, onTogglePago, onEdit, onDelete, onDeleteParcelamento, cartaoCor }: Props) {
   const [confirmando, setConfirmando] = useState(false)
+  const [confirmParcelaOpen, setConfirmParcelaOpen] = useState(false)
+  const { mesAtivo } = useAppStore()
   const alerta = getAlertaVencimento(conta.vencimento, conta.pago)
   const emoji = getBillEmoji(conta.nome)
   const avatarBg = getBillAvatarBg(conta.nome)
+
+  const parcelasInfo = conta.parcelas ? (() => {
+    const mr = conta.parcelas.total - conta.parcelas.atual
+    const cor = mr > 6 ? 'var(--green)' : mr >= 3 ? 'var(--amber)' : 'var(--red)'
+    const corMuted = mr > 6 ? 'var(--green-muted)' : mr >= 3 ? 'var(--amber-muted)' : 'var(--red-muted)'
+    const corBorder = mr > 6 ? 'rgba(52,199,123,0.22)' : mr >= 3 ? 'rgba(245,158,11,0.22)' : 'rgba(239,68,68,0.22)'
+    const mesTermina = mesIdAddMeses(mesAtivo, mr)
+    const totalRestante = conta.valor * (mr + 1)
+    return { mr, cor, corMuted, corBorder, mesTermina, totalRestante }
+  })() : null
 
   return (
     <motion.div
@@ -34,45 +50,46 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
       style={{
         borderBottom: '0.5px solid var(--divider)',
         cursor: 'default',
+        ...(conta.origem?.tipo === 'fatura_propagada' && cartaoCor
+          ? { borderLeft: `2.5px solid ${cartaoCor}` }
+          : {}),
       }}
       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.025)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
     >
-      {/* Checkbox toggle */}
+      {/* Checkbox toggle — touch target 36×36, visual 18×18 */}
       <button
-        onClick={() => onTogglePago(conta.id, !conta.pago)}
-        className="w-[18px] h-[18px] rounded-[5px] flex-shrink-0 flex items-center justify-center transition-all"
-        style={
-          conta.pago
-            ? {
-                background: '#10B981',
-                border: '1.5px solid #10B981',
-              }
-            : {
-                border: '1.5px solid rgba(255,255,255,0.15)',
-                background: 'transparent',
-              }
-        }
+        onClick={() => onTogglePago(conta.id, conta.pago)}
+        className="w-9 h-9 flex-shrink-0 flex items-center justify-center"
       >
-        {conta.pago && (
-          <motion.svg
-            initial={{ scale: 0.4, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-            width="9"
-            height="9"
-            viewBox="0 0 9 9"
-            fill="none"
-          >
-            <path
-              d="M1.5 4.5l2 2L7.5 2.5"
-              stroke="white"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </motion.svg>
-        )}
+        <div
+          className="w-[18px] h-[18px] rounded-[5px] flex items-center justify-center transition-all"
+          style={
+            conta.pago
+              ? { background: '#10B981', border: '1.5px solid #10B981' }
+              : { border: '1.5px solid rgba(255,255,255,0.15)', background: 'transparent' }
+          }
+        >
+          {conta.pago && (
+            <motion.svg
+              initial={{ scale: 0.4, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+              width="9"
+              height="9"
+              viewBox="0 0 9 9"
+              fill="none"
+            >
+              <path
+                d="M1.5 4.5l2 2L7.5 2.5"
+                stroke="white"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </motion.svg>
+          )}
+        </div>
       </button>
 
       {/* Emoji avatar */}
@@ -90,7 +107,7 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
           style={
             conta.pago
               ? {
-                  color: 'var(--text-subtle)',
+                  color: 'var(--text-tertiary)',
                   textDecoration: 'line-through',
                   textDecorationColor: 'rgba(255,255,255,0.18)',
                 }
@@ -99,7 +116,12 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
         >
           {conta.nome}
         </p>
-        <p className="text-[11px] mt-[1px]" style={{ color: 'var(--text-subtle)' }}>
+        {conta.pagamento && (
+          <p style={{ fontSize: 10, color: 'var(--green)', marginTop: 1, letterSpacing: '-0.01em' }}>
+            Pago em {new Date(conta.pagamento.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+          </p>
+        )}
+        <p className="text-[11px] mt-[1px]" style={{ color: 'var(--text-tertiary)' }}>
           {FORMA_LABEL[conta.formaPagamento]}
         </p>
       </div>
@@ -108,23 +130,23 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
       <div className="flex flex-col items-end gap-1 flex-shrink-0">
         <span
           className="text-[13px] font-semibold tabular-nums"
-          style={conta.pago ? { color: 'var(--text-subtle)' } : { color: '#fff', letterSpacing: '-0.02em' }}
+          style={conta.pago ? { color: 'var(--text-tertiary)' } : { color: '#fff', letterSpacing: '-0.02em' }}
         >
           {formatBRL(conta.valor)}
         </span>
 
         <div className="flex items-center gap-1 flex-wrap justify-end">
-          {conta.parcelas && (
+          {parcelasInfo && (
             <span
               className="text-[10px] font-medium px-1.5 py-[2px] rounded-full"
               style={{
-                background: 'rgba(124,114,216,0.12)',
-                color: '#9D94E8',
-                border: '0.5px solid rgba(124,114,216,0.22)',
+                background: parcelasInfo.corMuted,
+                color: parcelasInfo.cor,
+                border: `0.5px solid ${parcelasInfo.corBorder}`,
                 letterSpacing: '0.01em',
               }}
             >
-              {conta.parcelas.atual}/{conta.parcelas.total}
+              {conta.parcelas!.atual}/{conta.parcelas!.total}
             </span>
           )}
 
@@ -132,8 +154,8 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
             <span
               className="text-[10px] font-medium px-1.5 py-[2px] rounded-full"
               style={{
-                background: 'rgba(239,68,68,0.1)',
-                color: '#F87171',
+                background: 'var(--red-muted)',
+                color: 'var(--red)',
                 border: '0.5px solid rgba(239,68,68,0.2)',
               }}
             >
@@ -145,15 +167,34 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
             <span
               className="text-[10px] font-medium px-1.5 py-[2px] rounded-full"
               style={{
-                background: 'rgba(245,158,11,0.1)',
-                color: '#FBBF24',
+                background: 'var(--amber-muted)',
+                color: 'var(--amber)',
                 border: '0.5px solid rgba(245,158,11,0.2)',
               }}
             >
               Vence em breve
             </span>
           )}
+
+          {conta.origem?.tipo === 'fatura_propagada' && (
+            <span
+              className="text-[10px] font-medium px-1.5 py-[2px] rounded-full"
+              style={{
+                background: 'var(--amber-muted)',
+                color: 'var(--amber)',
+                border: '0.5px solid rgba(245,158,11,0.2)',
+              }}
+            >
+              Fatura anterior
+            </span>
+          )}
         </div>
+
+        {parcelasInfo && (
+          <p style={{ fontSize: 9, color: parcelasInfo.cor, letterSpacing: '-0.01em', textAlign: 'right' }}>
+            {mesIdToShortLabel(parcelasInfo.mesTermina)} · {formatBRL(parcelasInfo.totalRestante)}
+          </p>
+        )}
       </div>
 
       {/* Hover actions */}
@@ -169,22 +210,24 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
           >
             <button
               onClick={() => { onDelete(conta.id); setConfirmando(false) }}
-              className="text-[11px] font-medium px-2 py-[3px] rounded-md transition-colors"
+              className="text-[11px] font-medium px-3 py-2 rounded-md transition-colors"
               style={{
-                background: 'rgba(239,68,68,0.12)',
-                color: '#F87171',
+                background: 'var(--red-muted)',
+                color: 'var(--red)',
                 border: '0.5px solid rgba(239,68,68,0.22)',
+                minHeight: 36,
               }}
             >
               Excluir
             </button>
             <button
               onClick={() => setConfirmando(false)}
-              className="text-[11px] font-medium px-2 py-[3px] rounded-md"
+              className="text-[11px] font-medium px-3 py-2 rounded-md"
               style={{
                 background: 'rgba(255,255,255,0.05)',
-                color: 'var(--text-subtle)',
+                color: 'var(--text-tertiary)',
                 border: '0.5px solid rgba(255,255,255,0.08)',
+                minHeight: 36,
               }}
             >
               Não
@@ -196,29 +239,51 @@ export function BillItem({ conta, onTogglePago, onEdit, onDelete }: Props) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex-shrink-0"
+            className="flex items-center gap-0.5 opacity-40 group-hover:opacity-100 transition-opacity ml-1 flex-shrink-0"
           >
             <button
               onClick={() => onEdit(conta)}
               className="w-6 h-6 rounded-md flex items-center justify-center transition-colors"
-              style={{ color: 'var(--text-subtle)' }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-muted)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-subtle)')}
+              style={{ color: 'var(--text-tertiary)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
             >
-              <Pencil className="w-[11px] h-[11px]" />
+              <Pencil className="w-3 h-3" />
             </button>
             <button
-              onClick={() => setConfirmando(true)}
+              onClick={() => {
+                if (conta.parcelamentoId) {
+                  setConfirmParcelaOpen(true)
+                } else {
+                  setConfirmando(true)
+                }
+              }}
               className="w-6 h-6 rounded-md flex items-center justify-center transition-colors"
-              style={{ color: 'var(--text-subtle)' }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#F87171')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-subtle)')}
+              style={{ color: 'var(--text-tertiary)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
             >
-              <Trash2 className="w-[11px] h-[11px]" />
+              <Trash2 className="w-3 h-3" />
             </button>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {conta.parcelamentoId && (
+        <ConfirmDeleteParcelaModal
+          open={confirmParcelaOpen}
+          parcelaAtual={conta.parcelas?.atual ?? 1}
+          parcelaTotal={conta.parcelas?.total ?? 1}
+          onDeleteSo={() => { onDelete(conta.id); setConfirmParcelaOpen(false) }}
+          onDeleteRestantes={() => {
+            if (onDeleteParcelamento && conta.parcelamentoId && conta.parcelas) {
+              onDeleteParcelamento(conta.parcelamentoId, conta.parcelas.atual, conta.parcelas.total)
+            }
+            setConfirmParcelaOpen(false)
+          }}
+          onClose={() => setConfirmParcelaOpen(false)}
+        />
+      )}
     </motion.div>
   )
 }

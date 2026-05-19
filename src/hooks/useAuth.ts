@@ -3,6 +3,8 @@ import {
   signInWithPopup,
   signOut,
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
   User,
 } from 'firebase/auth'
 import { auth, googleProvider } from '@/lib/firebase'
@@ -27,6 +29,7 @@ export function useAuth(): UseAuthReturn {
   }, [])
 
   async function login() {
+    await setPersistence(auth, browserLocalPersistence)
     await signInWithPopup(auth, googleProvider)
   }
 
