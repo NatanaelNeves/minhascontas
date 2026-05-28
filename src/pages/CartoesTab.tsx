@@ -1,4 +1,4 @@
-import { CartaoComSaldo, CartaoInput, Conta, FaturaCalculada, BancoComSaldo, GastoRecorrente, Transacao } from '@/types'
+import { CartaoComSaldo, CartaoInput, Conta, FaturaCalculada, BancoComSaldo, GastoRecorrente, Transacao, TransacaoInput } from '@/types'
 import { CartoesList } from '@/components/Cartoes/CartoesList'
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
   onMarcarFaturaPaga: (faturaId: string, bancoId: string, dataPagamento: string) => void
   onCancelarRecorrente: (id: string) => Promise<void>
   onNavigateToBancos: () => void
+  onAddTransacao?: (data: TransacaoInput) => Promise<void>
 }
 
 export function CartoesTab(props: Props) {

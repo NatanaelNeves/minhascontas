@@ -61,6 +61,7 @@ export function Dashboard({ userId }: { userId: string }) {
     totalGastosBeneficios,
     gastosPorCategoria,
     addTransacao,
+    addTransferencia,
     updateTransacao,
     deleteTransacao,
   } = useTransactions(userId, mesAtivo)
@@ -408,6 +409,7 @@ export function Dashboard({ userId }: { userId: string }) {
                 bancos={bancos}
                 cartoes={cartoes}
                 onAdd={handleAddTransacao}
+                onAddTransferencia={addTransferencia}
                 onUpdate={handleUpdateTransacao}
                 onDelete={handleDeleteTransacao}
                 onUpdateCartao={updateCartao}
@@ -449,6 +451,7 @@ export function Dashboard({ userId }: { userId: string }) {
                 onMarcarFaturaPaga={marcarFaturaPaga}
                 onCancelarRecorrente={cancelarRecorrente}
                 onNavigateToBancos={() => setAbaAtiva('bancos')}
+                onAddTransacao={handleAddTransacao}
               />
             )}
           </motion.div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { CartaoComSaldo, CartaoInput, Conta, FaturaCalculada, BancoComSaldo, Cartao, GastoRecorrente, Transacao } from '@/types'
+import { CartaoComSaldo, CartaoInput, Conta, FaturaCalculada, BancoComSaldo, Cartao, GastoRecorrente, Transacao, TransacaoInput } from '@/types'
 import { formatBRL } from '@/lib/utils'
 import { CartaoCard } from './CartaoCard'
 import { CartaoModal } from './CartaoModal'
@@ -19,6 +19,7 @@ interface Props {
   onMarcarFaturaPaga: (faturaId: string, bancoId: string, dataPagamento: string, valorCustom?: number) => void
   onCancelarRecorrente: (id: string) => Promise<void>
   onNavigateToBancos: () => void
+  onAddTransacao?: (data: TransacaoInput) => Promise<void>
 }
 
 export function CartoesList({
@@ -34,6 +35,7 @@ export function CartoesList({
   onMarcarFaturaPaga,
   onCancelarRecorrente,
   onNavigateToBancos,
+  onAddTransacao,
 }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editando, setEditando] = useState<Cartao | null>(null)
@@ -133,6 +135,7 @@ export function CartoesList({
             onDelete={onDelete}
             onPagarFatura={faturaId => setPagarFaturaId(faturaId)}
             onDetail={() => setDetailCartao(c)}
+            onUpdate={onUpdate}
           />
         ))}
       </div>
@@ -165,6 +168,7 @@ export function CartoesList({
           if (detailCartao) { setPagarFaturaId(detailCartao.id); setDetailCartao(null) }
         }}
         onCancelarRecorrente={onCancelarRecorrente}
+        onAddTransacao={onAddTransacao}
       />
     </div>
   )

@@ -259,17 +259,90 @@ export function BankCard({ banco, onEdit, onDelete, onUpdate }: Props) {
           </button>
         </div>
       </div>
-      <span
-        className="text-2xl font-bold tracking-tight"
-        style={{ color: banco.saldoAtual >= 0 ? 'var(--text-primary)' : 'var(--red)' }}
-      >
-        {formatBRL(banco.saldoAtual)}
-      </span>
-      {(banco.entradas > 0 || banco.gastos > 0) && (
-        <div className="flex gap-4 text-xs">
-          {banco.entradas > 0 && <span style={{ color: 'var(--green)' }}>↑ {formatBRL(banco.entradas)}</span>}
-          {banco.gastos > 0 && <span style={{ color: 'var(--red)' }}>↓ {formatBRL(banco.gastos)}</span>}
+
+      {editandoSaldo ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div>
+            <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 6, fontWeight: 500 }}>
+              Saldo atual real
+            </p>
+            <div style={{ position: 'relative' }}>
+              <span style={{
+                position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+                fontSize: 14, fontWeight: 600, color: 'var(--text-tertiary)',
+                pointerEvents: 'none', userSelect: 'none',
+              }}>R$</span>
+              <input
+                autoFocus
+                value={centavosToDisplay(centStr)}
+                onChange={e => setCentStr(e.target.value.replace(/\D/g, ''))}
+                inputMode="numeric"
+                placeholder="0,00"
+                style={{
+                  width: '100%', paddingLeft: 36, padding: '10px 10px 10px 36px',
+                  background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
+                  borderRadius: 8, fontSize: 20, fontWeight: 700, color: '#fff',
+                  outline: 'none', fontFamily: 'inherit', letterSpacing: '-0.03em', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleConfirmarSaldo}
+              style={{
+                flex: 1, padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+                background: 'var(--text-primary)', color: 'var(--bg-base)',
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em',
+              }}
+            >
+              ✓ Confirmar
+            </button>
+            <button
+              onClick={() => setEditandoSaldo(false)}
+              style={{
+                flex: 1, padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+                background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
+                border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em',
+              }}
+            >
+              ✕ Cancelar
+            </button>
+          </div>
         </div>
+      ) : (
+        <>
+          <span
+            className="text-2xl font-bold tracking-tight"
+            style={{ color: banco.saldoAtual >= 0 ? 'var(--text-primary)' : 'var(--red)' }}
+          >
+            {formatBRL(banco.saldoAtual)}
+          </span>
+          {(banco.entradas > 0 || banco.gastos > 0) && (
+            <div className="flex gap-4 text-xs">
+              {banco.entradas > 0 && <span style={{ color: 'var(--green)' }}>↑ {formatBRL(banco.entradas)}</span>}
+              {banco.gastos > 0 && <span style={{ color: 'var(--red)' }}>↓ {formatBRL(banco.gastos)}</span>}
+            </div>
+          )}
+          {onUpdate && (
+            <button
+              onClick={handleAtualizarSaldo}
+              style={{
+                alignSelf: 'flex-start',
+                padding: '5px 12px', borderRadius: 99, fontSize: 11, fontWeight: 600,
+                background: 'var(--bg-elevated)', color: 'var(--text-tertiary)',
+                border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', gap: 5, letterSpacing: '-0.01em',
+                transition: 'color .15s, border-color .15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-strong)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-tertiary)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+            >
+              <RefreshCw size={10} strokeWidth={2.5} />
+              Atualizar saldo
+            </button>
+          )}
+        </>
       )}
     </motion.div>
   )

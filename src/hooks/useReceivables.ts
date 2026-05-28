@@ -22,6 +22,7 @@ function docToRecebivel(snap: QueryDocumentSnapshot<DocumentData>): AReceber {
     recebido: d.recebido ?? false,
     dataPrevista: d.dataPrevista ?? null,
     recorrente: d.recorrente ?? false,
+    mesInicial: d.mesInicial ?? undefined,
     criadoEm: d.criadoEm?.toDate() ?? new Date(),
   }
 }
@@ -77,12 +78,18 @@ export function useReceivables(userId: string, mesId: string): UseReceivablesRet
   }, [userId, mesId])
 
   const recebiveis = useMemo(() => {
-    const global = globalRecebiveis.map(r => ({
-      ...r,
-      recebido: globalStatus.get(r.id) ?? false,
-    }))
+    const global = globalRecebiveis
+      .filter(r => {
+        const inicial = r.mesInicial ??
+          `${r.criadoEm.getFullYear()}-${String(r.criadoEm.getMonth() + 1).padStart(2, '0')}`
+        return mesId >= inicial
+      })
+      .map(r => ({
+        ...r,
+        recebido: globalStatus.get(r.id) ?? false,
+      }))
     return [...global, ...monthlyRecebiveis]
-  }, [globalRecebiveis, globalStatus, monthlyRecebiveis])
+  }, [globalRecebiveis, globalStatus, monthlyRecebiveis, mesId])
 
   const totalPendente = useMemo(
     () => recebiveis.filter(r => !r.recebido).reduce((s, r) => s + r.valor, 0),
@@ -91,7 +98,7 @@ export function useReceivables(userId: string, mesId: string): UseReceivablesRet
 
   async function addRecebivel(r: AReceberInput) {
     if (r.recorrente) {
-      await addDoc(collection(db, globalRecPath), { ...r, criadoEm: serverTimestamp() })
+      await addDoc(collection(db, globalRecPath), { ...r, mesInicial: mesId, criadoEm: serverTimestamp() })
     } else {
       await addDoc(collection(db, recPath), { ...r, criadoEm: serverTimestamp() })
     }

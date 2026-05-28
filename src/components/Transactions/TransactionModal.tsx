@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { Transacao, TransacaoInput, BancoComSaldo, TipoTransacao, Cartao, FormaPagamentoTransacao } from '@/types'
+import { Transacao, TransacaoInput, BancoComSaldo, TipoTransacao, Cartao, FormaPagamentoTransacao, TransferenciaInput } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
 import { formatMesLabel, centavosToDisplay, valorToCentStr } from '@/lib/utils'
 import { isCartaoBeneficio, isCartaoCredito } from '@/lib/cartoes'
+
+type TipoModal = TipoTransacao | 'transferencia'
 
 const CATEGORIAS: { value: string; label: string; emoji: string }[] = [
   { value: 'alimentacao', label: 'Alimentação', emoji: '🍔' },
@@ -48,13 +50,15 @@ interface Props {
   bancos: BancoComSaldo[]
   cartoes?: Cartao[]
   onSave: (data: TransacaoInput, isRecorrente?: boolean) => void
+  onSaveTransferencia?: (data: TransferenciaInput) => void
   onClose: () => void
 }
 
-export function TransactionModal({ open, editando, bancos, cartoes = [], onSave, onClose }: Props) {
+export function TransactionModal({ open, editando, bancos, cartoes = [], onSave, onSaveTransferencia, onClose }: Props) {
   const { mesAtivo } = useAppStore()
   const hoje = new Date().toISOString().split('T')[0]
-  const [tipo, setTipo] = useState<TipoTransacao>('gasto')
+  const [tipo, setTipo] = useState<TipoModal>('gasto')
+  const [bancoDestinoId, setBancoDestinoId] = useState('')
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamentoTransacao>('pix')
   const [descricao, setDescricao] = useState('')
   const [centStr, setCentStr] = useState('')
@@ -76,7 +80,7 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
 
   useEffect(() => {
     if (editando) {
-      setTipo(editando.tipo)
+      setTipo(editando.tipo as TipoModal)
       setDescricao(editando.descricao)
       setCentStr(valorToCentStr(editando.valor))
       setBancoId(editando.bancoId ?? '')
@@ -107,6 +111,7 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
       setDescricao('')
       setCentStr('')
       setBancoId(bancos[0]?.id ?? '')
+      setBancoDestinoId('')
       setCartaoId(undefined)
       setCategoria('outros')
       setCustomMode(false)
@@ -133,6 +138,20 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
 
   function handleSave() {
     if (!descricao.trim() || getCents() <= 0) return
+
+    if (tipo === 'transferencia') {
+      if (!bancoId || !bancoDestinoId || bancoId === bancoDestinoId) return
+      onSaveTransferencia?.({
+        bancoOrigemId: bancoId,
+        bancoDestinoId,
+        valor: getCents() / 100,
+        descricao: descricao.trim(),
+        data,
+        ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
+      })
+      onClose()
+      return
+    }
 
     const usaBanco = formasComBanco.includes(formaPagamento)
     const usaCartaoCredito = formasComCartaoCredito.includes(formaPagamento)
@@ -164,7 +183,10 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
   const usaBanco = formasComBanco.includes(formaPagamento)
   const usaCartaoCredito = formasComCartaoCredito.includes(formaPagamento)
   const usaBeneficio = formasComBeneficio.includes(formaPagamento)
-  const canSave = descricao.trim().length > 0 && getCents() > 0 && categoriaValida && (!usaBanco || !!bancoId) && (!usaCartaoCredito && !usaBeneficio || !!cartaoId)
+  const canSaveTransferencia = tipo === 'transferencia' && descricao.trim().length > 0 && getCents() > 0 && !!bancoId && !!bancoDestinoId && bancoId !== bancoDestinoId
+  const canSave = tipo === 'transferencia'
+    ? canSaveTransferencia
+    : descricao.trim().length > 0 && getCents() > 0 && categoriaValida && (!usaBanco || !!bancoId) && (!usaCartaoCredito && !usaBeneficio || !!cartaoId)
 
   function focusInput(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
     e.target.style.borderColor = 'var(--border-strong)'
@@ -235,20 +257,22 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
               <div>
                 <Label>Tipo</Label>
                 <div style={{ display: 'flex', gap: 3, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 3 }}>
-                  {(['gasto', 'entrada'] as TipoTransacao[]).map(t => (
+                  {(['gasto', 'entrada', 'transferencia'] as TipoModal[]).map(t => (
                     <button
                       key={t}
                       type="button"
                       onClick={() => setTipo(t)}
+                      disabled={!!editando && t === 'transferencia'}
                       style={{
                         flex: 1, padding: '8px 6px', borderRadius: 7, fontSize: 13, fontWeight: 500,
-                        cursor: 'pointer', border: 'none', fontFamily: 'inherit', transition: 'all .15s',
+                        cursor: (!!editando && t === 'transferencia') ? 'not-allowed' : 'pointer',
+                        border: 'none', fontFamily: 'inherit', transition: 'all .15s',
                         background: tipo === t ? 'var(--text-primary)' : 'transparent',
                         color: tipo === t ? 'var(--bg-base)' : 'var(--text-secondary)',
                         letterSpacing: '-0.01em',
                       }}
                     >
-                      {t === 'gasto' ? 'Gasto' : 'Entrada'}
+                      {t === 'gasto' ? 'Gasto' : t === 'entrada' ? 'Entrada' : 'Transferência'}
                     </button>
                   ))}
                 </div>
@@ -287,45 +311,104 @@ export function TransactionModal({ open, editando, bancos, cartoes = [], onSave,
                 </div>
               </div>
 
+              {/* Banco origem + destino — transferência */}
+              {tipo === 'transferencia' && bancos.length > 0 && (
+                <>
+                  <div>
+                    <Label>Banco de origem</Label>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {bancos.map(b => {
+                        const sel = bancoId === b.id
+                        return (
+                          <button
+                            key={b.id}
+                            type="button"
+                            onClick={() => setBancoId(b.id)}
+                            style={{
+                              padding: '7px 14px', borderRadius: 99, fontSize: 13, fontWeight: 500,
+                              cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s', letterSpacing: '-0.01em',
+                              border: sel ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                              background: sel ? 'var(--text-primary)' : 'var(--bg-surface)',
+                              color: sel ? 'var(--bg-base)' : 'var(--text-secondary)',
+                            }}
+                          >
+                            {b.nome}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Banco de destino</Label>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {bancos.map(b => {
+                        const sel = bancoDestinoId === b.id
+                        const isOrigem = bancoId === b.id
+                        return (
+                          <button
+                            key={b.id}
+                            type="button"
+                            onClick={() => !isOrigem && setBancoDestinoId(b.id)}
+                            style={{
+                              padding: '7px 14px', borderRadius: 99, fontSize: 13, fontWeight: 500,
+                              cursor: isOrigem ? 'not-allowed' : 'pointer',
+                              fontFamily: 'inherit', transition: 'all .15s', letterSpacing: '-0.01em',
+                              opacity: isOrigem ? 0.35 : 1,
+                              border: sel ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                              background: sel ? 'var(--text-primary)' : 'var(--bg-surface)',
+                              color: sel ? 'var(--bg-base)' : 'var(--text-secondary)',
+                            }}
+                          >
+                            {b.nome}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+
               {/* Forma de pagamento */}
-              <div>
-                <Label>Forma de pagamento</Label>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {[
-                    { value: 'pix', label: 'Pix' },
-                    { value: 'debito', label: 'Débito' },
-                    { value: 'boleto', label: 'Boleto' },
-                    { value: 'credito', label: 'Crédito' },
-                    { value: 'vale_alimentacao', label: 'VA' },
-                    { value: 'vale_refeicao', label: 'VR' },
-                    { value: 'vale_combustivel', label: 'Combustível' },
-                  ].map(opt => {
-                    const sel = formaPagamento === opt.value
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => {
-                          setFormaPagamento(opt.value as FormaPagamentoTransacao)
-                          setCartaoId(undefined)
-                        }}
-                        style={{
-                          padding: '7px 12px', borderRadius: 99, fontSize: 12, fontWeight: 500,
-                          cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s', letterSpacing: '-0.01em',
-                          border: sel ? '1px solid var(--text-primary)' : '1px solid var(--border)',
-                          background: sel ? 'var(--text-primary)' : 'var(--bg-surface)',
-                          color: sel ? 'var(--bg-base)' : 'var(--text-secondary)',
-                        }}
-                      >
-                        {opt.label}
-                      </button>
-                    )
-                  })}
+              {tipo !== 'transferencia' && (
+                <div>
+                  <Label>Forma de pagamento</Label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {[
+                      { value: 'pix', label: 'Pix' },
+                      { value: 'debito', label: 'Débito' },
+                      { value: 'boleto', label: 'Boleto' },
+                      { value: 'credito', label: 'Crédito' },
+                      { value: 'vale_alimentacao', label: 'VA' },
+                      { value: 'vale_refeicao', label: 'VR' },
+                      { value: 'vale_combustivel', label: 'Combustível' },
+                    ].map(opt => {
+                      const sel = formaPagamento === opt.value
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            setFormaPagamento(opt.value as FormaPagamentoTransacao)
+                            setCartaoId(undefined)
+                          }}
+                          style={{
+                            padding: '7px 12px', borderRadius: 99, fontSize: 12, fontWeight: 500,
+                            cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s', letterSpacing: '-0.01em',
+                            border: sel ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                            background: sel ? 'var(--text-primary)' : 'var(--bg-surface)',
+                            color: sel ? 'var(--bg-base)' : 'var(--text-secondary)',
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Banco — chips */}
-              {formasComBanco.includes(formaPagamento) && bancos.length > 0 && (
+              {tipo !== 'transferencia' && formasComBanco.includes(formaPagamento) && bancos.length > 0 && (
                 <div>
                   <Label>Banco</Label>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

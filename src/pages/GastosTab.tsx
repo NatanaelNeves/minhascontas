@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Search } from 'lucide-react'
-import { Transacao, TransacaoInput, BancoComSaldo, Cartao, GastoRecorrenteInput } from '@/types'
+import { Transacao, TransacaoInput, BancoComSaldo, Cartao, GastoRecorrenteInput, TransferenciaInput } from '@/types'
 import { TransactionList } from '@/components/Transactions/TransactionList'
 import { TransactionModal } from '@/components/Transactions/TransactionModal'
 import { isCartaoCredito } from '@/lib/cartoes'
@@ -10,6 +10,7 @@ interface Props {
   bancos: BancoComSaldo[]
   cartoes: Cartao[]
   onAdd: (data: TransacaoInput) => Promise<void>
+  onAddTransferencia: (data: TransferenciaInput) => Promise<void>
   onUpdate: (id: string, data: Partial<TransacaoInput>) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onUpdateCartao: (id: string, data: Partial<Cartao>) => Promise<void>
@@ -17,7 +18,7 @@ interface Props {
   onCancelarRecorrente: (id: string) => Promise<void>
 }
 
-export function GastosTab({ transacoes, bancos, cartoes, onAdd, onUpdate, onDelete, onUpdateCartao, onAddRecorrente, onCancelarRecorrente }: Props) {
+export function GastosTab({ transacoes, bancos, cartoes, onAdd, onAddTransferencia, onUpdate, onDelete, onUpdateCartao, onAddRecorrente, onCancelarRecorrente }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editando, setEditando] = useState<Transacao | null>(null)
   const [busca, setBusca] = useState('')
@@ -86,8 +87,9 @@ export function GastosTab({ transacoes, bancos, cartoes, onAdd, onUpdate, onDele
 
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase()
-    if (!q) return transacoes
-    return transacoes.filter(t => t.descricao.toLowerCase().includes(q))
+    const visíveis = transacoes.filter(t => !(t.tipo === 'entrada' && t.origem?.tipo === 'transferencia'))
+    if (!q) return visíveis
+    return visíveis.filter(t => t.descricao.toLowerCase().includes(q))
   }, [transacoes, busca])
 
   return (
@@ -139,6 +141,9 @@ export function GastosTab({ transacoes, bancos, cartoes, onAdd, onUpdate, onDele
         bancos={bancos}
         cartoes={cartoes}
         onSave={handleSave}
+        onSaveTransferencia={async (data) => {
+          await onAddTransferencia(data)
+        }}
         onClose={() => {
           setModalOpen(false)
           setEditando(null)

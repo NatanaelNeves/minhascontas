@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Pencil, Trash2 } from 'lucide-react'
-import { CartaoComSaldo, Conta, FaturaCalculada } from '@/types'
-import { formatBRL } from '@/lib/utils'
+import { Pencil, Trash2, SlidersHorizontal } from 'lucide-react'
+import { CartaoComSaldo, CartaoInput, Conta, FaturaCalculada } from '@/types'
+import { formatBRL, centavosToDisplay, valorToCentStr } from '@/lib/utils'
 import { ConfirmDeleteModal } from '@/components/Modals/ConfirmDeleteModal'
 import { getLabelTipoCartao, recargaEmBreve } from '@/lib/cartoes'
 
@@ -14,11 +14,14 @@ interface Props {
   onDelete: (id: string) => void
   onPagarFatura: (faturaId: string) => void
   onDetail: () => void
+  onUpdate?: (id: string, data: Partial<CartaoInput>) => void
 }
 
-export function CartaoCard({ cartao, contasDoCartao, fatura, onEdit, onDelete, onPagarFatura, onDetail }: Props) {
+export function CartaoCard({ cartao, contasDoCartao, fatura, onEdit, onDelete, onPagarFatura, onDetail, onUpdate }: Props) {
   const [hovered, setHovered] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [editandoGasto, setEditandoGasto] = useState(false)
+  const [gastoCentStr, setGastoCentStr] = useState('')
 
   const nParcelamentos = useMemo(() => {
     const ids = new Set(contasDoCartao.filter(c => c.parcelamentoId).map(c => c.parcelamentoId!))
@@ -37,6 +40,25 @@ export function CartaoCard({ cartao, contasDoCartao, fatura, onEdit, onDelete, o
     'var(--green)'
   const isCredito = cartao.tipo === 'credito'
   const recargaBadge = !isCredito && recargaEmBreve(cartao.diaRecarga) && (cartao.recargaMensal ?? 0) > 0
+
+  function handleAbrirEdicaoGasto(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (cartao.tipo !== 'credito') return
+    setGastoCentStr(valorToCentStr((cartao as { gastoAtual?: number }).gastoAtual ?? 0))
+    setEditandoGasto(true)
+  }
+
+  function handleConfirmarGasto(e: React.MouseEvent) {
+    e.stopPropagation()
+    const valor = parseInt(gastoCentStr || '0', 10) / 100
+    onUpdate?.(cartao.id, { gastoAtual: valor > 0 ? valor : undefined } as Partial<CartaoInput>)
+    setEditandoGasto(false)
+  }
+
+  function handleCancelarGasto(e: React.MouseEvent) {
+    e.stopPropagation()
+    setEditandoGasto(false)
+  }
 
   return (
     <>
@@ -140,6 +162,80 @@ export function CartaoCard({ cartao, contasDoCartao, fatura, onEdit, onDelete, o
             <p style={{ fontSize: 12, color: 'var(--text-secondary)', letterSpacing: '-0.01em' }}>
               Usado: {formatBRL(cartao.totalUsado)} de {formatBRL(cartao.limite)} · Fecha dia {cartao.diaFechamento}
             </p>
+
+            {/* Inline edit gastoAtual */}
+            {editandoGasto ? (
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 2 }}
+              >
+                <p style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 500 }}>
+                  Comprometido manualmente (fatura)
+                </p>
+                <div style={{ position: 'relative' }}>
+                  <span style={{
+                    position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+                    fontSize: 14, fontWeight: 600, color: 'var(--text-tertiary)',
+                    pointerEvents: 'none', userSelect: 'none',
+                  }}>R$</span>
+                  <input
+                    autoFocus
+                    value={centavosToDisplay(gastoCentStr)}
+                    onChange={e => setGastoCentStr(e.target.value.replace(/\D/g, ''))}
+                    inputMode="numeric"
+                    placeholder="0,00"
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      width: '100%', padding: '9px 10px 9px 36px', boxSizing: 'border-box',
+                      background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
+                      borderRadius: 8, fontSize: 18, fontWeight: 700, color: '#fff',
+                      outline: 'none', fontFamily: 'inherit', letterSpacing: '-0.03em',
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={handleConfirmarGasto}
+                    style={{
+                      flex: 1, padding: '9px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                      background: 'var(--text-primary)', color: 'var(--bg-base)',
+                      border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    ✓ Confirmar
+                  </button>
+                  <button
+                    onClick={handleCancelarGasto}
+                    style={{
+                      flex: 1, padding: '9px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                      background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
+                      border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    ✕ Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              onUpdate && (
+                <button
+                  onClick={handleAbrirEdicaoGasto}
+                  style={{
+                    alignSelf: 'flex-start',
+                    padding: '4px 10px', borderRadius: 99, fontSize: 11, fontWeight: 600,
+                    background: 'var(--bg-elevated)', color: 'var(--text-tertiary)',
+                    border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', gap: 5, letterSpacing: '-0.01em',
+                    opacity: hovered ? 1 : 0, transition: 'opacity .15s, color .15s, border-color .15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-strong)' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-tertiary)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+                >
+                  <SlidersHorizontal size={10} strokeWidth={2.5} />
+                  Ajustar comprometido
+                </button>
+              )
+            )}
           </>
         )}
 

@@ -1,12 +1,24 @@
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X } from 'lucide-react'
-import { CartaoComSaldo, Conta, FaturaCalculada, GastoRecorrente, Transacao } from '@/types'
-import { formatBRL, mesIdAddMeses, mesIdToShortLabel } from '@/lib/utils'
+import { X, Plus } from 'lucide-react'
+import { CartaoComSaldo, Conta, FaturaCalculada, GastoRecorrente, Transacao, TransacaoInput } from '@/types'
+import { formatBRL, mesIdAddMeses, mesIdToShortLabel, centavosToDisplay } from '@/lib/utils'
 import { getLabelTipoCartao } from '@/lib/cartoes'
 import { useAppStore } from '@/store/useAppStore'
 import { ConfirmDeleteModal } from '@/components/Modals/ConfirmDeleteModal'
+
+const CATEGORIAS_FATURA = [
+  { value: 'alimentacao', label: 'Alimentação', emoji: '🍔' },
+  { value: 'transporte', label: 'Transporte', emoji: '🚗' },
+  { value: 'saude', label: 'Saúde', emoji: '💊' },
+  { value: 'lazer', label: 'Lazer', emoji: '🎮' },
+  { value: 'educacao', label: 'Educação', emoji: '📚' },
+  { value: 'moradia', label: 'Moradia', emoji: '🏠' },
+  { value: 'vestuario', label: 'Vestuário', emoji: '👕' },
+  { value: 'servicos', label: 'Serviços', emoji: '⚡' },
+  { value: 'outros', label: 'Outros', emoji: '📦' },
+]
 
 interface Props {
   open: boolean
@@ -18,6 +30,7 @@ interface Props {
   onClose: () => void
   onPagarFatura: () => void
   onCancelarRecorrente: (id: string) => Promise<void>
+  onAddTransacao?: (data: TransacaoInput) => Promise<void>
 }
 
 function parcelaCor(mr: number) {
@@ -36,9 +49,34 @@ function parcelaCorBorder(mr: number) {
   return 'rgba(239,68,68,0.25)'
 }
 
-export function CartaoDetailSheet({ open, cartao, contas, fatura, gastosRecorrentes, transacoesBeneficio, onClose, onPagarFatura, onCancelarRecorrente }: Props) {
+export function CartaoDetailSheet({ open, cartao, contas, fatura, gastosRecorrentes, transacoesBeneficio, onClose, onPagarFatura, onCancelarRecorrente, onAddTransacao }: Props) {
   const { mesAtivo } = useAppStore()
   const [cancelarRecorrenteId, setCancelarRecorrenteId] = useState<string | null>(null)
+  const hoje = new Date().toISOString().split('T')[0]
+  const [addingItem, setAddingItem] = useState(false)
+  const [novoDesc, setNovoDesc] = useState('')
+  const [novoCentStr, setNovoCentStr] = useState('')
+  const [novaCategoria, setNovaCategoria] = useState('outros')
+  const [novaData, setNovaData] = useState(hoje)
+
+  async function handleAddItem() {
+    if (!cartao || !novoDesc.trim() || parseInt(novoCentStr || '0') <= 0) return
+    await onAddTransacao?.({
+      tipo: 'gasto',
+      descricao: novoDesc.trim(),
+      valor: parseInt(novoCentStr) / 100,
+      categoria: novaCategoria,
+      cartaoId: cartao.id,
+      formaPagamento: 'credito',
+      data: novaData,
+      despesaFixa: false,
+    })
+    setNovoDesc('')
+    setNovoCentStr('')
+    setNovaCategoria('outros')
+    setNovaData(hoje)
+    setAddingItem(false)
+  }
 
   const parcelamentos = useMemo(() => {
     const seen = new Set<string>()
@@ -215,35 +253,177 @@ export function CartaoDetailSheet({ open, cartao, contas, fatura, gastosRecorren
               )}
 
               {/* Gastos avulsos — credit cards: transactions from fatura */}
-              {cartao.tipo === 'credito' && creditAvulsos.length > 0 && (
+              {cartao.tipo === 'credito' && (
                 <div>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 10 }}>
-                    Gastos avulsos do mês
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {creditAvulsos.map(t => (
-                      <div key={t.id} style={{
-                        padding: '10px 14px',
-                        background: 'var(--bg-surface)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 'var(--radius-md)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-                      }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {t.descricao}
-                          </p>
-                          <p style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 1 }}>
-                            {new Date(t.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                            {t.tipo === 'gasto' ? ` · ${t.categoria}` : ''}
-                          </p>
-                        </div>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-                          {formatBRL(t.valor)}
-                        </span>
-                      </div>
-                    ))}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase' }}>
+                      Gastos avulsos do mês
+                    </p>
+                    {onAddTransacao && !addingItem && (
+                      <button
+                        onClick={() => setAddingItem(true)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          padding: '4px 10px', borderRadius: 99, fontSize: 11, fontWeight: 600,
+                          background: 'var(--bg-surface)', color: 'var(--text-tertiary)',
+                          border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit',
+                          letterSpacing: '-0.01em', transition: 'color .15s, border-color .15s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.borderColor = 'var(--border-strong)' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-tertiary)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+                      >
+                        <Plus size={11} strokeWidth={2.5} />
+                        Adicionar
+                      </button>
+                    )}
                   </div>
+
+                  {/* Formulário inline de adição */}
+                  {addingItem && (
+                    <div style={{
+                      padding: '14px', marginBottom: 10,
+                      background: 'var(--bg-surface)', border: '1px solid var(--border-strong)',
+                      borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: 12,
+                    }}>
+                      {/* Descrição */}
+                      <input
+                        autoFocus
+                        value={novoDesc}
+                        onChange={e => setNovoDesc(e.target.value)}
+                        placeholder="Descrição (ex: Jantar, Netflix...)"
+                        style={{
+                          width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                          borderRadius: 8, padding: '9px 12px', fontSize: 13, color: '#fff',
+                          outline: 'none', fontFamily: 'inherit', letterSpacing: '-0.01em', boxSizing: 'border-box',
+                        }}
+                        onFocus={e => (e.target.style.borderColor = 'var(--border-strong)')}
+                        onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+                        onKeyDown={e => e.key === 'Enter' && handleAddItem()}
+                      />
+
+                      {/* Valor */}
+                      <div style={{ position: 'relative' }}>
+                        <span style={{
+                          position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                          fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)',
+                          pointerEvents: 'none', userSelect: 'none',
+                        }}>R$</span>
+                        <input
+                          value={centavosToDisplay(novoCentStr)}
+                          onChange={e => setNovoCentStr(e.target.value.replace(/\D/g, ''))}
+                          placeholder="0,00"
+                          inputMode="numeric"
+                          style={{
+                            width: '100%', paddingLeft: 42, padding: '10px 12px 10px 42px', boxSizing: 'border-box',
+                            background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                            borderRadius: 8, fontSize: 24, fontWeight: 700, color: '#fff',
+                            outline: 'none', fontFamily: 'inherit', letterSpacing: '-0.04em',
+                          }}
+                          onFocus={e => (e.target.style.borderColor = 'var(--border-strong)')}
+                          onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+                        />
+                      </div>
+
+                      {/* Categoria */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {CATEGORIAS_FATURA.map(c => {
+                          const sel = novaCategoria === c.value
+                          return (
+                            <button
+                              key={c.value}
+                              type="button"
+                              onClick={() => setNovaCategoria(c.value)}
+                              style={{
+                                padding: '5px 10px', borderRadius: 99, fontSize: 11, fontWeight: 500,
+                                cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+                                display: 'flex', alignItems: 'center', gap: 4,
+                                border: sel ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                                background: sel ? 'var(--text-primary)' : 'var(--bg-elevated)',
+                                color: sel ? 'var(--bg-base)' : 'var(--text-secondary)',
+                              }}
+                            >
+                              <span style={{ fontSize: 10 }}>{c.emoji}</span>
+                              {c.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      {/* Data */}
+                      <input
+                        type="date"
+                        value={novaData}
+                        onChange={e => setNovaData(e.target.value)}
+                        style={{
+                          width: '100%', background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                          borderRadius: 8, padding: '9px 12px', fontSize: 13, color: '#fff',
+                          outline: 'none', fontFamily: 'inherit', colorScheme: 'dark', boxSizing: 'border-box',
+                        }}
+                        onFocus={e => (e.target.style.borderColor = 'var(--border-strong)')}
+                        onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+                      />
+
+                      {/* Botões */}
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={handleAddItem}
+                          disabled={!novoDesc.trim() || parseInt(novoCentStr || '0') <= 0}
+                          style={{
+                            flex: 2, padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                            background: (!novoDesc.trim() || parseInt(novoCentStr || '0') <= 0) ? 'rgba(255,255,255,0.06)' : 'var(--text-primary)',
+                            color: (!novoDesc.trim() || parseInt(novoCentStr || '0') <= 0) ? 'var(--text-tertiary)' : 'var(--bg-base)',
+                            border: 'none', cursor: (!novoDesc.trim() || parseInt(novoCentStr || '0') <= 0) ? 'not-allowed' : 'pointer',
+                            fontFamily: 'inherit', transition: 'all .2s',
+                          }}
+                        >
+                          Adicionar à fatura
+                        </button>
+                        <button
+                          onClick={() => { setAddingItem(false); setNovoDesc(''); setNovoCentStr('') }}
+                          style={{
+                            flex: 1, padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                            background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
+                            border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {creditAvulsos.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {creditAvulsos.map(t => (
+                        <div key={t.id} style={{
+                          padding: '10px 14px',
+                          background: 'var(--bg-surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 'var(--radius-md)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                        }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {t.descricao}
+                            </p>
+                            <p style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 1 }}>
+                              {new Date(t.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                              {t.tipo === 'gasto' ? ` · ${t.categoria}` : ''}
+                            </p>
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                            {formatBRL(t.valor)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {creditAvulsos.length === 0 && !addingItem && (
+                    <p style={{ fontSize: 12, color: 'var(--text-tertiary)', textAlign: 'center', padding: '12px 0' }}>
+                      Nenhum gasto avulso registrado
+                    </p>
+                  )}
                 </div>
               )}
 

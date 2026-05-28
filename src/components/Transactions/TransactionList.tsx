@@ -52,7 +52,10 @@ export function TransactionList({ transacoes, bancos, cartoes = [], onEdit, onDe
     <div className="flex flex-col gap-1">
       {grupos.map(([data, txs]) => {
         const totalDia = txs.reduce(
-          (s, t) => s + (t.tipo === 'gasto' ? -t.valor : t.valor),
+          (s, t) => {
+            if (t.origem?.tipo === 'transferencia') return s
+            return s + (t.tipo === 'gasto' ? -t.valor : t.valor)
+          },
           0,
         )
         return (

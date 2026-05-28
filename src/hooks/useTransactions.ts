@@ -9,11 +9,12 @@ import {
   serverTimestamp,
   query,
   orderBy,
+  writeBatch,
   QueryDocumentSnapshot,
   DocumentData,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Transacao, TransacaoInput, TIPOS_BENEFICIO, TipoBeneficio } from '@/types'
+import { Transacao, TransacaoInput, TIPOS_BENEFICIO, TipoBeneficio, TransferenciaInput } from '@/types'
 
 function docToTransacao(snap: QueryDocumentSnapshot<DocumentData>): Transacao {
   const d = snap.data()
@@ -29,6 +30,7 @@ function docToTransacao(snap: QueryDocumentSnapshot<DocumentData>): Transacao {
     formaPagamento: d.formaPagamento ?? undefined,
     origem: d.origem,
     recorrenteId: d.recorrenteId ?? undefined,
+    transferDestBancoId: d.transferDestBancoId ?? undefined,
     criadoEm: d.criadoEm?.toDate() ?? new Date(),
   }
   if (d.tipo === 'gasto') {
@@ -47,6 +49,7 @@ export interface UseTransactionsReturn {
   gastosPorDia: { data: string; total: number }[]
   isLoading: boolean
   addTransacao: (t: TransacaoInput) => Promise<void>
+  addTransferencia: (t: TransferenciaInput) => Promise<void>
   updateTransacao: (id: string, data: Partial<TransacaoInput>) => Promise<void>
   deleteTransacao: (id: string) => Promise<void>
 }
@@ -69,7 +72,9 @@ export function useTransactions(userId: string, mesId: string): UseTransactionsR
   }, [userId, mesId])
 
   const totalGastos = useMemo(
-    () => transacoes.filter(t => t.tipo === 'gasto').reduce((s, t) => s + t.valor, 0),
+    () => transacoes
+      .filter(t => t.tipo === 'gasto' && t.origem?.tipo !== 'transferencia')
+      .reduce((s, t) => s + t.valor, 0),
     [transacoes],
   )
 
@@ -79,6 +84,7 @@ export function useTransactions(userId: string, mesId: string): UseTransactionsR
         t.tipo === 'gasto' &&
         t.origem?.tipo !== 'pagamento_fatura' &&
         t.origem?.tipo !== 'bill' &&
+        t.origem?.tipo !== 'transferencia' &&
         (t.formaPagamento == null || !TIPOS_BENEFICIO.includes(t.formaPagamento as TipoBeneficio))
       )
       .reduce((s, t) => s + t.valor, 0),
@@ -89,6 +95,7 @@ export function useTransactions(userId: string, mesId: string): UseTransactionsR
     () => transacoes
       .filter(t =>
         t.tipo === 'gasto' &&
+        t.origem?.tipo !== 'transferencia' &&
         t.formaPagamento != null &&
         TIPOS_BENEFICIO.includes(t.formaPagamento as TipoBeneficio)
       )
@@ -97,14 +104,16 @@ export function useTransactions(userId: string, mesId: string): UseTransactionsR
   )
 
   const totalEntradas = useMemo(
-    () => transacoes.filter(t => t.tipo === 'entrada').reduce((s, t) => s + t.valor, 0),
+    () => transacoes
+      .filter(t => t.tipo === 'entrada' && t.origem?.tipo !== 'transferencia')
+      .reduce((s, t) => s + t.valor, 0),
     [transacoes],
   )
 
   const gastosPorCategoria = useMemo(() => {
     const acc = {} as Record<string, number>
     transacoes.forEach(t => {
-      if (t.tipo === 'gasto') {
+      if (t.tipo === 'gasto' && t.origem?.tipo !== 'transferencia') {
         acc[t.categoria] = (acc[t.categoria] ?? 0) + t.valor
       }
     })
@@ -114,7 +123,7 @@ export function useTransactions(userId: string, mesId: string): UseTransactionsR
   const gastosPorDia = useMemo(() => {
     const map = new Map<string, number>()
     transacoes.forEach(t => {
-      if (t.tipo === 'gasto') {
+      if (t.tipo === 'gasto' && t.origem?.tipo !== 'transferencia') {
         map.set(t.data, (map.get(t.data) ?? 0) + t.valor)
       }
     })
@@ -127,11 +136,50 @@ export function useTransactions(userId: string, mesId: string): UseTransactionsR
     await addDoc(collection(db, path), { ...t, criadoEm: serverTimestamp() })
   }
 
+  async function addTransferencia(t: TransferenciaInput) {
+    const batch = writeBatch(db)
+    const gastoRef = doc(collection(db, path))
+    const entradaRef = doc(collection(db, path))
+    batch.set(gastoRef, {
+      tipo: 'gasto',
+      categoria: 'outros',
+      descricao: t.descricao,
+      valor: t.valor,
+      data: t.data,
+      bancoId: t.bancoOrigemId,
+      transferDestBancoId: t.bancoDestinoId,
+      despesaFixa: false,
+      origem: { tipo: 'transferencia', id: entradaRef.id },
+      ...(t.observacao ? { observacao: t.observacao } : {}),
+      criadoEm: serverTimestamp(),
+    })
+    batch.set(entradaRef, {
+      tipo: 'entrada',
+      descricao: t.descricao,
+      valor: t.valor,
+      data: t.data,
+      bancoId: t.bancoDestinoId,
+      despesaFixa: false,
+      origem: { tipo: 'transferencia', id: gastoRef.id },
+      ...(t.observacao ? { observacao: t.observacao } : {}),
+      criadoEm: serverTimestamp(),
+    })
+    await batch.commit()
+  }
+
   async function updateTransacao(id: string, data: Partial<TransacaoInput>) {
     await updateDoc(doc(db, path, id), data)
   }
 
   async function deleteTransacao(id: string) {
+    const tx = transacoes.find(t => t.id === id)
+    if (tx?.origem?.tipo === 'transferencia' && tx.origem.id) {
+      const batch = writeBatch(db)
+      batch.delete(doc(db, path, id))
+      batch.delete(doc(db, path, tx.origem.id))
+      await batch.commit()
+      return
+    }
     await deleteDoc(doc(db, path, id))
   }
 
@@ -145,6 +193,7 @@ export function useTransactions(userId: string, mesId: string): UseTransactionsR
     gastosPorDia,
     isLoading,
     addTransacao,
+    addTransferencia,
     updateTransacao,
     deleteTransacao,
   }

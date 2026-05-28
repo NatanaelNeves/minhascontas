@@ -79,7 +79,17 @@ export interface AReceber {
   recebido: boolean
   dataPrevista: string | null
   recorrente?: boolean
+  mesInicial?: string
   criadoEm: Date
+}
+
+export interface TransferenciaInput {
+  bancoOrigemId: string
+  bancoDestinoId: string
+  valor: number
+  descricao: string
+  data: string
+  observacao?: string
 }
 
 export type TipoTransacao = 'gasto' | 'entrada'
@@ -94,7 +104,7 @@ export const CATEGORIAS_FIXAS = [
 ] as const
 
 export interface TransacaoOrigem {
-  tipo: 'bill' | 'receivable' | 'pagamento_fatura'
+  tipo: 'bill' | 'receivable' | 'pagamento_fatura' | 'transferencia'
   id?: string
 }
 
@@ -110,6 +120,7 @@ type TransacaoBase = {
   formaPagamento?: FormaPagamentoTransacao
   origem?: TransacaoOrigem
   recorrenteId?: string
+  transferDestBancoId?: string
   criadoEm: Date
 }
 

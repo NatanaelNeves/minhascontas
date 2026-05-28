@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, Trash2, RefreshCw } from 'lucide-react'
+import { Pencil, Trash2, RefreshCw, ArrowRightLeft } from 'lucide-react'
 import { Transacao, BancoComSaldo, CategoriaGasto, Cartao } from '@/types'
 import { formatBRL } from '@/lib/utils'
 import { ConfirmDeleteModal } from '@/components/Modals/ConfirmDeleteModal'
@@ -31,13 +31,17 @@ export function TransactionItem({ transacao: t, bancos, cartoes, onEdit, onDelet
   const [hovered, setHovered] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmCancelRec, setConfirmCancelRec] = useState(false)
+  const isTransferencia = t.origem?.tipo === 'transferencia'
   const banco = bancos.find(b => b.id === t.bancoId)
+  const bancoDest = isTransferencia && t.transferDestBancoId ? bancos.find(b => b.id === t.transferDestBancoId) : null
   const cartao = t.cartaoId ? cartoes.find(c => c.id === t.cartaoId) ?? null : null
-  const labelOrigem = cartao
-    ? `${cartao.nome}${isCartaoCredito(cartao) ? ' · Crédito' : ` · ${getLabelTipoCartao(cartao.tipo)}`}`
-    : banco?.nome
-  const isReadOnly = !!t.origem
-  const emoji = t.tipo === 'gasto' ? CATEGORIA_EMOJI[t.categoria] : '💰'
+  const labelOrigem = isTransferencia
+    ? banco && bancoDest ? `${banco.nome} → ${bancoDest.nome}` : banco?.nome
+    : cartao
+      ? `${cartao.nome}${isCartaoCredito(cartao) ? ' · Crédito' : ` · ${getLabelTipoCartao(cartao.tipo)}`}`
+      : banco?.nome
+  const isReadOnly = !!t.origem && !isTransferencia
+  const emoji = t.tipo === 'gasto' ? CATEGORIA_EMOJI[t.categoria] ?? '📦' : '💰'
 
   return (
     <>
@@ -48,9 +52,11 @@ export function TransactionItem({ transacao: t, bancos, cartoes, onEdit, onDelet
       >
         <div
           className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0"
-          style={{ background: 'var(--bg-elevated)' }}
+          style={{ background: isTransferencia ? 'rgba(99,102,241,0.12)' : 'var(--bg-elevated)' }}
         >
-          {emoji}
+          {isTransferencia
+            ? <ArrowRightLeft size={15} style={{ color: 'rgba(129,140,248,1)' }} />
+            : emoji}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
@@ -85,9 +91,13 @@ export function TransactionItem({ transacao: t, bancos, cartoes, onEdit, onDelet
         <div className="flex items-center gap-2 shrink-0">
           <span
             className="text-sm font-semibold tabular-nums"
-            style={{ color: t.tipo === 'gasto' ? 'var(--red)' : 'var(--green)' }}
+            style={{
+              color: isTransferencia
+                ? 'rgba(129,140,248,0.85)'
+                : t.tipo === 'gasto' ? 'var(--red)' : 'var(--green)',
+            }}
           >
-            {t.tipo === 'gasto' ? '-' : '+'}{formatBRL(t.valor)}
+            {isTransferencia ? '' : t.tipo === 'gasto' ? '-' : '+'}{formatBRL(t.valor)}
           </span>
           <div
             className="flex items-center gap-1"
@@ -110,15 +120,17 @@ export function TransactionItem({ transacao: t, bancos, cartoes, onEdit, onDelet
             )}
             {!isReadOnly && (
               <>
-                <button
-                  onClick={() => onEdit(t)}
-                  className="w-6 h-6 flex items-center justify-center rounded"
-                  style={{ color: 'var(--text-tertiary)', transition: 'color .12s' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
+                {!isTransferencia && (
+                  <button
+                    onClick={() => onEdit(t)}
+                    className="w-6 h-6 flex items-center justify-center rounded"
+                    style={{ color: 'var(--text-tertiary)', transition: 'color .12s' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
                 <button
                   onClick={() => setConfirmOpen(true)}
                   className="w-6 h-6 flex items-center justify-center rounded"
@@ -136,8 +148,8 @@ export function TransactionItem({ transacao: t, bancos, cartoes, onEdit, onDelet
 
       <ConfirmDeleteModal
         open={confirmOpen}
-        titulo="Excluir lançamento?"
-        descricao="Este lançamento será removido permanentemente."
+        titulo={isTransferencia ? 'Excluir transferência?' : 'Excluir lançamento?'}
+        descricao={isTransferencia ? 'A transferência será removida de ambos os bancos.' : 'Este lançamento será removido permanentemente.'}
         onConfirm={() => onDelete(t.id)}
         onClose={() => setConfirmOpen(false)}
       />
