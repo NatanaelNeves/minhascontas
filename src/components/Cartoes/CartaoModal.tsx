@@ -100,10 +100,8 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
       setTipo(editando.tipo)
       setCor(editando.cor)
       if (editando.tipo === 'credito') {
-        // Em edição, padrão é "Disponível agora" com o valor atual pré-preenchido
-        const dispAtual = (editando as CartaoComSaldo).limiteDisponivel ?? editando.limite
-        setModoLimite('disponivel')
-        setLimiteCentStr(valorToCentStr(dispAtual))
+        setModoLimite('total')
+        setLimiteCentStr(valorToCentStr(editando.limite))
         setDiaFechamento(editando.diaFechamento)
         setDiaVencimento(editando.diaVencimento)
         setGastoAtualCentStr(editando.gastoAtual ? valorToCentStr(editando.gastoAtual) : '')
@@ -314,7 +312,7 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
                               if (modo === 'total') {
                                 setLimiteCentStr(valorToCentStr(editando.limite))
                               } else {
-                                const disp = (editando as CartaoComSaldo).limiteDisponivel ?? editando.limite
+                                const disp = Math.max(0, (editando as CartaoComSaldo).limiteDisponivel ?? editando.limite)
                                 setLimiteCentStr(valorToCentStr(disp))
                               }
                             }}
