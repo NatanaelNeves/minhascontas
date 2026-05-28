@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { Cartao, CartaoInput, TipoCartao } from '@/types'
+import { Cartao, CartaoComSaldo, CartaoInput, TipoCartao } from '@/types'
 import { useAppStore } from '@/store/useAppStore'
-import { formatMesLabel, centavosToDisplay, valorToCentStr } from '@/lib/utils'
+import { formatMesLabel, centavosToDisplay, valorToCentStr, formatBRL } from '@/lib/utils'
 import { OPERADORAS_BENEFICIO } from '@/lib/cartoes'
 
 const TIPOS: { value: TipoCartao; label: string }[] = [
@@ -91,6 +91,7 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
   const [diaRecarga, setDiaRecarga] = useState<number | ''>('')
   const [operadora, setOperadora] = useState('')
   const [cor, setCor] = useState(CORES_CARTAO[0])
+  const [modoLimite, setModoLimite] = useState<'total' | 'disponivel'>('total')
 
   useEffect(() => {
     if (editando) {
@@ -128,6 +129,7 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
       setOperadora('')
       setCor(CORES_CARTAO[0])
     }
+    setModoLimite('total')
   }, [editando, open])
 
   useEffect(() => {
@@ -152,10 +154,14 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
 
     if (tipo === 'credito') {
       if (getCents() <= 0) return
+      const totalUsadoAtual = editando ? ((editando as CartaoComSaldo).totalUsado ?? 0) : 0
+      const limiteParaSalvar = modoLimite === 'disponivel' && editando
+        ? getCents() / 100 + totalUsadoAtual
+        : getCents() / 100
       onSave({
         nome: nome.trim(),
         tipo,
-        limite: getCents() / 100,
+        limite: limiteParaSalvar,
         diaFechamento,
         diaVencimento,
         cor,
@@ -288,7 +294,28 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
               {tipo === 'credito' && (
                 <>
                   <div>
-                    <Label>Limite total</Label>
+                    {/* Toggle modo limite — só em edição */}
+                    {editando && (
+                      <div style={{ display: 'flex', gap: 3, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 3, marginBottom: 10 }}>
+                        {([['total', 'Limite total'], ['disponivel', 'Disponível agora']] as const).map(([modo, label]) => (
+                          <button
+                            key={modo}
+                            type="button"
+                            onClick={() => setModoLimite(modo)}
+                            style={{
+                              flex: 1, padding: '6px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+                              cursor: 'pointer', border: 'none', fontFamily: 'inherit', transition: 'all .15s',
+                              background: modoLimite === modo ? 'var(--text-primary)' : 'transparent',
+                              color: modoLimite === modo ? 'var(--bg-base)' : 'var(--text-secondary)',
+                              letterSpacing: '-0.01em',
+                            }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <Label>{modoLimite === 'disponivel' ? 'Quanto tenho disponível agora' : 'Limite total'}</Label>
                     <div style={{ position: 'relative' }}>
                       <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)', pointerEvents: 'none', userSelect: 'none' }}>
                         R$
@@ -303,6 +330,15 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
                         onBlur={blurInput}
                       />
                     </div>
+                    {/* Preview do limite total quando no modo disponível */}
+                    {modoLimite === 'disponivel' && editando && getCents() > 0 && (
+                      <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                        Limite total que será salvo:{' '}
+                        <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          {formatBRL(getCents() / 100 + ((editando as CartaoComSaldo).totalUsado ?? 0))}
+                        </span>
+                      </p>
+                    )}
                   </div>
 
                   <div>
