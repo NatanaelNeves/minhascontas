@@ -92,6 +92,7 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
   const [operadora, setOperadora] = useState('')
   const [cor, setCor] = useState(CORES_CARTAO[0])
   const [modoLimite, setModoLimite] = useState<'total' | 'disponivel'>('total')
+  const [rastrearDetalhado, setRastrearDetalhado] = useState(true)
 
   useEffect(() => {
     if (editando) {
@@ -99,10 +100,14 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
       setTipo(editando.tipo)
       setCor(editando.cor)
       if (editando.tipo === 'credito') {
-        setLimiteCentStr(valorToCentStr(editando.limite))
+        // Em edição, padrão é "Disponível agora" com o valor atual pré-preenchido
+        const dispAtual = (editando as CartaoComSaldo).limiteDisponivel ?? editando.limite
+        setModoLimite('disponivel')
+        setLimiteCentStr(valorToCentStr(dispAtual))
         setDiaFechamento(editando.diaFechamento)
         setDiaVencimento(editando.diaVencimento)
         setGastoAtualCentStr(editando.gastoAtual ? valorToCentStr(editando.gastoAtual) : '')
+        setRastrearDetalhado(editando.rastrearDetalhado ?? true)
         setSaldoAtualCentStr('')
         setRecargaMensalCentStr('')
         setDiaRecarga('')
@@ -128,6 +133,7 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
       setDiaRecarga('')
       setOperadora('')
       setCor(CORES_CARTAO[0])
+      setRastrearDetalhado(true)
     }
     setModoLimite('total')
   }, [editando, open])
@@ -165,6 +171,7 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
         diaFechamento,
         diaVencimento,
         cor,
+        rastrearDetalhado,
         ...(getGastoCents() > 0 ? { gastoAtual: getGastoCents() / 100 } : {}),
       })
     } else {
@@ -301,7 +308,16 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
                           <button
                             key={modo}
                             type="button"
-                            onClick={() => setModoLimite(modo)}
+                            onClick={() => {
+                              setModoLimite(modo)
+                              if (!editando || editando.tipo !== 'credito') return
+                              if (modo === 'total') {
+                                setLimiteCentStr(valorToCentStr(editando.limite))
+                              } else {
+                                const disp = (editando as CartaoComSaldo).limiteDisponivel ?? editando.limite
+                                setLimiteCentStr(valorToCentStr(disp))
+                              }
+                            }}
                             style={{
                               flex: 1, padding: '6px', borderRadius: 6, fontSize: 12, fontWeight: 500,
                               cursor: 'pointer', border: 'none', fontFamily: 'inherit', transition: 'all .15s',
@@ -369,6 +385,37 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
                     </div>
                     <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
                       Quanto já tem comprometido hoje. Soma na fatura sem precisar cadastrar conta por conta.
+                    </p>
+                  </div>
+
+                  {/* Toggle como registrar gastos */}
+                  <div>
+                    <Label>Como registrar gastos</Label>
+                    <div style={{ display: 'flex', gap: 3, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 3 }}>
+                      {([
+                        { value: false, label: 'Simples', desc: 'Adiciono a fatura como uma conta' },
+                        { value: true, label: 'Detalhado', desc: 'Rastreio cada gasto individual' },
+                      ] as const).map(opt => (
+                        <button
+                          key={String(opt.value)}
+                          type="button"
+                          onClick={() => setRastrearDetalhado(opt.value)}
+                          style={{
+                            flex: 1, padding: '8px 6px', borderRadius: 7, fontSize: 13, fontWeight: 500,
+                            cursor: 'pointer', border: 'none', fontFamily: 'inherit', transition: 'all .15s',
+                            background: rastrearDetalhado === opt.value ? 'var(--text-primary)' : 'transparent',
+                            color: rastrearDetalhado === opt.value ? 'var(--bg-base)' : 'var(--text-secondary)',
+                            letterSpacing: '-0.01em',
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                      {rastrearDetalhado
+                        ? 'Rastreio cada gasto individual — seção "Faturas do mês" aparece na aba Contas'
+                        : 'Adiciono a fatura como uma conta no BillList — seção automática fica oculta'}
                     </p>
                   </div>
                 </>

@@ -100,8 +100,15 @@ export function Dashboard({ userId }: { userId: string }) {
         }
       }
 
+      const faturaAtual = faturas.find(f => f.cartaoId === cartao.id)
+      const faturaPaga = faturaAtual?.pago ?? false
+      // Quando a fatura é paga, as transações avulsas daquele ciclo não reduzem mais o limite
+      const txIdsDaFatura = faturaPaga
+        ? new Set(faturaAtual!.gastosAvulsos.map(t => t.id))
+        : new Set<string>()
+
       const totalDeTx = transacoes
-        .filter(t => t.cartaoId === cartao.id && t.tipo === 'gasto')
+        .filter(t => t.cartaoId === cartao.id && t.tipo === 'gasto' && !txIdsDaFatura.has(t.id))
         .reduce((sum, t) => sum + t.valor, 0)
       const totalDeContas = contas
         .filter(c => c.cartaoId === cartao.id && !c.pago)
@@ -111,12 +118,14 @@ export function Dashboard({ userId }: { userId: string }) {
           }
           return sum + c.valor
         }, 0)
-      const totalUsado = totalDeTx + totalDeContas + (cartao.gastoAtual ?? 0)
+      // gastoAtual também é liberado quando a fatura é paga
+      const gastoAtualEfetivo = faturaPaga ? 0 : (cartao.gastoAtual ?? 0)
+      const totalUsado = totalDeTx + totalDeContas + gastoAtualEfetivo
       const limiteDisponivel = cartao.limite - totalUsado
       const percentualUsado = cartao.limite > 0 ? (totalUsado / cartao.limite) * 100 : 0
       return { ...cartao, totalUsado, limiteDisponivel, percentualUsado, recargaEmBreve: false }
     })
-  }, [cartoes, transacoes, contas])
+  }, [cartoes, transacoes, contas, faturas])
 
   type PendingPropagacao =
     | { tipo: 'editar'; conta: Conta; updates: Partial<ContaInput> }

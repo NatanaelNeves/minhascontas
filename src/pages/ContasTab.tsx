@@ -6,7 +6,7 @@ import { BillModal } from '@/components/Modals/BillModal'
 import { PagarContaModal } from '@/components/Modals/PagarContaModal'
 import { SelectBancoModal } from '@/components/Modals/SelectBancoModal'
 import { ConfirmDeleteModal } from '@/components/Modals/ConfirmDeleteModal'
-import { Conta, ContaInput, BancoComSaldo, FaturaCalculada, Cartao, ContaOrigem } from '@/types'
+import { Conta, ContaInput, BancoComSaldo, FaturaCalculada, Cartao, CartaoCredito, ContaOrigem } from '@/types'
 import { formatBRL } from '@/lib/utils'
 
 interface Props {
@@ -167,14 +167,20 @@ export function ContasTab({
         </div>
       )}
 
-      {/* Faturas do mês */}
-      {faturas.length > 0 && (
+      {/* Faturas do mês — só cartões com rastrearDetalhado !== false */}
+      {faturas.filter(f => {
+        const cartao = cartoes.find(c => c.id === f.cartaoId)
+        return !cartao || cartao.tipo !== 'credito' || (cartao as CartaoCredito).rastrearDetalhado !== false
+      }).length > 0 && (
         <div>
           <p style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 10 }}>
             Faturas do mês
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {faturas.map(fatura => {
+            {faturas.filter(f => {
+              const cartao = cartoes.find(c => c.id === f.cartaoId)
+              return !cartao || cartao.tipo !== 'credito' || (cartao as CartaoCredito).rastrearDetalhado !== false
+            }).map(fatura => {
               const expanded = expandedFaturaId === fatura.cartaoId
               const isPago = fatura.pago
               const nItens = fatura.gastosAvulsos.length + fatura.contasParceladas.length

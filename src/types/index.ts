@@ -168,6 +168,7 @@ export interface CartaoCredito extends CartaoBase {
   diaFechamento: number
   diaVencimento: number
   gastoAtual?: number
+  rastrearDetalhado?: boolean
   saldoAtual?: never
   operadora?: never
   recargaMensal?: never
