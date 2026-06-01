@@ -166,11 +166,9 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
 
       let gastoAtualParaSalvar: number | undefined
       if (editando && editando.tipo === 'credito' && disponivelAlterado) {
-        // Usuário editou "Disponível agora": retrocomputa gastoAtual
+        // Usuário editou "Disponível agora": gastoAtual = limite - disponivel
         const dispCents = parseInt(disponivelCentStr || '0', 10)
-        const gastoAtualAtual = editando.gastoAtual ?? 0
-        const totalDeTxContas = Math.max(0, ((editando as CartaoComSaldo).totalUsado ?? 0) - gastoAtualAtual)
-        const novoGastoAtual = Math.max(0, limiteParaSalvar - dispCents / 100 - totalDeTxContas)
+        const novoGastoAtual = Math.max(0, limiteParaSalvar - dispCents / 100)
         gastoAtualParaSalvar = novoGastoAtual > 0 ? novoGastoAtual : undefined
       } else if (editando && editando.tipo === 'credito') {
         // Limite mudou mas disponível não foi tocado: preserva gastoAtual existente
@@ -358,9 +356,7 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
                       </div>
                       {/* Preview do comprometido que será salvo */}
                       {disponivelAlterado && getCents() > 0 && parseInt(disponivelCentStr || '0') >= 0 && editando.tipo === 'credito' && (() => {
-                        const gastoAtualAtual = editando.gastoAtual ?? 0
-                        const totalDeTxContas = Math.max(0, ((editando as CartaoComSaldo).totalUsado ?? 0) - gastoAtualAtual)
-                        const novoGastoAtual = Math.max(0, getCents() / 100 - parseInt(disponivelCentStr || '0') / 100 - totalDeTxContas)
+                        const novoGastoAtual = Math.max(0, getCents() / 100 - parseInt(disponivelCentStr || '0') / 100)
                         return novoGastoAtual > 0 ? (
                           <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
                             Comprometido calculado:{' '}

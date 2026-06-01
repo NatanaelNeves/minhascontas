@@ -51,7 +51,7 @@ export function CartaoCard({ cartao, contasDoCartao, fatura, onEdit, onDelete, o
   function handleConfirmarGasto(e: React.MouseEvent) {
     e.stopPropagation()
     const valor = parseInt(gastoCentStr || '0', 10) / 100
-    onUpdate?.(cartao.id, { gastoAtual: valor > 0 ? valor : undefined } as Partial<CartaoInput>)
+    onUpdate?.(cartao.id, { tipo: 'credito', gastoAtual: valor > 0 ? valor : 0 } as Partial<CartaoInput>)
     setEditandoGasto(false)
   }
 
