@@ -15,6 +15,7 @@ interface Props {
   gastosRecorrentes: GastoRecorrente[]
   onAdd: (data: CartaoInput) => void
   onUpdate: (id: string, data: Partial<CartaoInput>) => void
+  onSetGastoAtual?: (id: string, valor: number) => Promise<void>
   onDelete: (id: string) => void
   onMarcarFaturaPaga: (faturaId: string, bancoId: string, dataPagamento: string, valorCustom?: number) => void
   onCancelarRecorrente: (id: string) => Promise<void>
@@ -31,6 +32,7 @@ export function CartoesList({
   gastosRecorrentes,
   onAdd,
   onUpdate,
+  onSetGastoAtual,
   onDelete,
   onMarcarFaturaPaga,
   onCancelarRecorrente,
@@ -136,6 +138,7 @@ export function CartoesList({
             onPagarFatura={faturaId => setPagarFaturaId(faturaId)}
             onDetail={() => setDetailCartao(c)}
             onUpdate={onUpdate}
+            onSetGastoAtual={onSetGastoAtual}
           />
         ))}
       </div>

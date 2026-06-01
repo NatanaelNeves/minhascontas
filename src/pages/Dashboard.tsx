@@ -84,7 +84,7 @@ export function Dashboard({ userId }: { userId: string }) {
     desmarcarRecebido,
   } = useReceivables(userId, mesAtivo)
 
-  const { cartoes, addCartao, updateCartao, deleteCartao } = useCartoes(userId)
+  const { cartoes, addCartao, updateCartao, setGastoAtual, deleteCartao } = useCartoes(userId)
   const { faturas, marcarFaturaPaga, desmarcarFaturaPaga } = useFaturas(userId, mesAtivo, cartoes, transacoes, contas)
   const { addRecorrente, cancelarRecorrente, criarTransacoesParaMes, gastosRecorrentes } = useGastosRecorrentes(userId)
 
@@ -456,6 +456,7 @@ export function Dashboard({ userId }: { userId: string }) {
                 gastosRecorrentes={gastosRecorrentes}
                 onAdd={addCartao}
                 onUpdate={updateCartao}
+                onSetGastoAtual={setGastoAtual}
                 onDelete={deleteCartao}
                 onMarcarFaturaPaga={marcarFaturaPaga}
                 onCancelarRecorrente={cancelarRecorrente}

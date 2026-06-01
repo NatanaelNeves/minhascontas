@@ -15,9 +15,10 @@ interface Props {
   onPagarFatura: (faturaId: string) => void
   onDetail: () => void
   onUpdate?: (id: string, data: Partial<CartaoInput>) => void
+  onSetGastoAtual?: (id: string, valor: number) => Promise<void>
 }
 
-export function CartaoCard({ cartao, contasDoCartao, fatura, onEdit, onDelete, onPagarFatura, onDetail, onUpdate }: Props) {
+export function CartaoCard({ cartao, contasDoCartao, fatura, onEdit, onDelete, onPagarFatura, onDetail, onUpdate, onSetGastoAtual }: Props) {
   const [hovered, setHovered] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [editandoGasto, setEditandoGasto] = useState(false)
@@ -51,7 +52,7 @@ export function CartaoCard({ cartao, contasDoCartao, fatura, onEdit, onDelete, o
   function handleConfirmarGasto(e: React.MouseEvent) {
     e.stopPropagation()
     const valor = parseInt(gastoCentStr || '0', 10) / 100
-    onUpdate?.(cartao.id, { gastoAtual: valor > 0 ? valor : 0 } as Partial<CartaoInput>)
+    onSetGastoAtual?.(cartao.id, valor)
     setEditandoGasto(false)
   }
 

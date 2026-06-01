@@ -77,6 +77,7 @@ export interface UseCartoesReturn {
   isLoading: boolean
   addCartao: (c: CartaoInput) => Promise<void>
   updateCartao: (id: string, data: Partial<CartaoInput>) => Promise<void>
+  setGastoAtual: (id: string, valor: number) => Promise<void>
   deleteCartao: (id: string) => Promise<void>
 }
 
@@ -150,9 +151,18 @@ export function useCartoes(userId: string): UseCartoesReturn {
         : data)
   }
 
+  async function setGastoAtual(id: string, valor: number) {
+    const ref = doc(db, path, id)
+    if (valor > 0) {
+      await updateDoc(ref, { gastoAtual: valor })
+    } else {
+      await updateDoc(ref, { gastoAtual: deleteField() })
+    }
+  }
+
   async function deleteCartao(id: string) {
     await deleteDoc(doc(db, path, id))
   }
 
-  return { cartoes, isLoading, addCartao, updateCartao, deleteCartao }
+  return { cartoes, isLoading, addCartao, updateCartao, setGastoAtual, deleteCartao }
 }
