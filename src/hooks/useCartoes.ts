@@ -42,6 +42,7 @@ function docToCartao(snap: QueryDocumentSnapshot<DocumentData>): Cartao {
     diaFechamento: typeof d.diaFechamento === 'number' ? d.diaFechamento : 1,
     diaVencimento: typeof d.diaVencimento === 'number' ? d.diaVencimento : 10,
     gastoAtual: typeof d.gastoAtual === 'number' ? d.gastoAtual : undefined,
+    rastrearDetalhado: typeof d.rastrearDetalhado === 'boolean' ? d.rastrearDetalhado : undefined,
     cor: d.cor,
     criadoEm: d.criadoEm?.toDate() ?? new Date(),
   } satisfies CartaoCredito

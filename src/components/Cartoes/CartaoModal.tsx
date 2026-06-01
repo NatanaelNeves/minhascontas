@@ -91,7 +91,8 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
   const [diaRecarga, setDiaRecarga] = useState<number | ''>('')
   const [operadora, setOperadora] = useState('')
   const [cor, setCor] = useState(CORES_CARTAO[0])
-  const [modoLimite, setModoLimite] = useState<'total' | 'disponivel'>('total')
+  const [disponivelCentStr, setDisponivelCentStr] = useState('')
+  const [disponivelAlterado, setDisponivelAlterado] = useState(false)
   const [rastrearDetalhado, setRastrearDetalhado] = useState(true)
 
   useEffect(() => {
@@ -100,8 +101,10 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
       setTipo(editando.tipo)
       setCor(editando.cor)
       if (editando.tipo === 'credito') {
-        setModoLimite('total')
         setLimiteCentStr(valorToCentStr(editando.limite))
+        const dispAtual = Math.max(0, (editando as CartaoComSaldo).limiteDisponivel ?? editando.limite)
+        setDisponivelCentStr(valorToCentStr(dispAtual))
+        setDisponivelAlterado(false)
         setDiaFechamento(editando.diaFechamento)
         setDiaVencimento(editando.diaVencimento)
         setGastoAtualCentStr(editando.gastoAtual ? valorToCentStr(editando.gastoAtual) : '')
@@ -126,6 +129,8 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
       setDiaFechamento(1)
       setDiaVencimento(10)
       setGastoAtualCentStr('')
+      setDisponivelCentStr('')
+      setDisponivelAlterado(false)
       setSaldoAtualCentStr('')
       setRecargaMensalCentStr('')
       setDiaRecarga('')
@@ -133,7 +138,6 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
       setCor(CORES_CARTAO[0])
       setRastrearDetalhado(true)
     }
-    setModoLimite('total')
   }, [editando, open])
 
   useEffect(() => {
@@ -158,10 +162,24 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
 
     if (tipo === 'credito') {
       if (getCents() <= 0) return
-      const totalUsadoAtual = editando ? ((editando as CartaoComSaldo).totalUsado ?? 0) : 0
-      const limiteParaSalvar = modoLimite === 'disponivel' && editando
-        ? getCents() / 100 + totalUsadoAtual
-        : getCents() / 100
+      const limiteParaSalvar = getCents() / 100
+
+      let gastoAtualParaSalvar: number | undefined
+      if (editando && editando.tipo === 'credito' && disponivelAlterado) {
+        // Usuário editou "Disponível agora": retrocomputa gastoAtual
+        const dispCents = parseInt(disponivelCentStr || '0', 10)
+        const gastoAtualAtual = editando.gastoAtual ?? 0
+        const totalDeTxContas = Math.max(0, ((editando as CartaoComSaldo).totalUsado ?? 0) - gastoAtualAtual)
+        const novoGastoAtual = Math.max(0, limiteParaSalvar - dispCents / 100 - totalDeTxContas)
+        gastoAtualParaSalvar = novoGastoAtual > 0 ? novoGastoAtual : undefined
+      } else if (editando && editando.tipo === 'credito') {
+        // Limite mudou mas disponível não foi tocado: preserva gastoAtual existente
+        gastoAtualParaSalvar = editando.gastoAtual
+      } else {
+        // Novo cartão: usa o campo "Já gastei"
+        gastoAtualParaSalvar = getGastoCents() > 0 ? getGastoCents() / 100 : undefined
+      }
+
       onSave({
         nome: nome.trim(),
         tipo,
@@ -170,7 +188,7 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
         diaVencimento,
         cor,
         rastrearDetalhado,
-        ...(getGastoCents() > 0 ? { gastoAtual: getGastoCents() / 100 } : {}),
+        ...(gastoAtualParaSalvar !== undefined ? { gastoAtual: gastoAtualParaSalvar } : {}),
       })
     } else {
       if (getSaldoCents() <= 0) return
@@ -298,38 +316,9 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
 
               {tipo === 'credito' && (
                 <>
+                  {/* Campo 1: Limite total do cartão */}
                   <div>
-                    {/* Toggle modo limite — só em edição */}
-                    {editando && (
-                      <div style={{ display: 'flex', gap: 3, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 3, marginBottom: 10 }}>
-                        {([['total', 'Limite total'], ['disponivel', 'Disponível agora']] as const).map(([modo, label]) => (
-                          <button
-                            key={modo}
-                            type="button"
-                            onClick={() => {
-                              setModoLimite(modo)
-                              if (!editando || editando.tipo !== 'credito') return
-                              if (modo === 'total') {
-                                setLimiteCentStr(valorToCentStr(editando.limite))
-                              } else {
-                                const disp = Math.max(0, (editando as CartaoComSaldo).limiteDisponivel ?? editando.limite)
-                                setLimiteCentStr(valorToCentStr(disp))
-                              }
-                            }}
-                            style={{
-                              flex: 1, padding: '6px', borderRadius: 6, fontSize: 12, fontWeight: 500,
-                              cursor: 'pointer', border: 'none', fontFamily: 'inherit', transition: 'all .15s',
-                              background: modoLimite === modo ? 'var(--text-primary)' : 'transparent',
-                              color: modoLimite === modo ? 'var(--bg-base)' : 'var(--text-secondary)',
-                              letterSpacing: '-0.01em',
-                            }}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <Label>{modoLimite === 'disponivel' ? 'Quanto tenho disponível agora' : 'Limite total'}</Label>
+                    <Label>Limite do cartão</Label>
                     <div style={{ position: 'relative' }}>
                       <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)', pointerEvents: 'none', userSelect: 'none' }}>
                         R$
@@ -344,16 +333,67 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
                         onBlur={blurInput}
                       />
                     </div>
-                    {/* Preview do limite total quando no modo disponível */}
-                    {modoLimite === 'disponivel' && editando && getCents() > 0 && (
-                      <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
-                        Limite total que será salvo:{' '}
-                        <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
-                          {formatBRL(getCents() / 100 + ((editando as CartaoComSaldo).totalUsado ?? 0))}
-                        </span>
-                      </p>
-                    )}
                   </div>
+
+                  {/* Campo 2: Disponível agora (só em edição) */}
+                  {editando && (
+                    <div>
+                      <Label>Disponível agora</Label>
+                      <div style={{ position: 'relative' }}>
+                        <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, fontWeight: 600, color: 'var(--text-tertiary)', pointerEvents: 'none', userSelect: 'none' }}>
+                          R$
+                        </span>
+                        <input
+                          value={centavosToDisplay(disponivelCentStr)}
+                          onChange={e => {
+                            setDisponivelCentStr(e.target.value.replace(/\D/g, ''))
+                            setDisponivelAlterado(true)
+                          }}
+                          placeholder="0,00"
+                          inputMode="numeric"
+                          style={{ ...baseInput, paddingLeft: 46, fontSize: 24, fontWeight: 700, letterSpacing: '-0.04em', height: 58 }}
+                          onFocus={focusInput}
+                          onBlur={blurInput}
+                        />
+                      </div>
+                      {/* Preview do comprometido que será salvo */}
+                      {disponivelAlterado && getCents() > 0 && parseInt(disponivelCentStr || '0') >= 0 && editando.tipo === 'credito' && (() => {
+                        const gastoAtualAtual = editando.gastoAtual ?? 0
+                        const totalDeTxContas = Math.max(0, ((editando as CartaoComSaldo).totalUsado ?? 0) - gastoAtualAtual)
+                        const novoGastoAtual = Math.max(0, getCents() / 100 - parseInt(disponivelCentStr || '0') / 100 - totalDeTxContas)
+                        return novoGastoAtual > 0 ? (
+                          <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                            Comprometido calculado:{' '}
+                            <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{formatBRL(novoGastoAtual)}</span>
+                          </p>
+                        ) : null
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Já gastei — só para cartão novo */}
+                  {!editando && (
+                    <div>
+                      <Label>Já gastei neste cartão (opcional)</Label>
+                      <div style={{ position: 'relative' }}>
+                        <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 14, fontWeight: 600, color: 'var(--text-tertiary)', pointerEvents: 'none', userSelect: 'none' }}>
+                          R$
+                        </span>
+                        <input
+                          value={centavosToDisplay(gastoAtualCentStr)}
+                          onChange={e => setGastoAtualCentStr(e.target.value.replace(/\D/g, ''))}
+                          placeholder="0,00"
+                          inputMode="numeric"
+                          style={{ ...baseInput, paddingLeft: 42, fontSize: 18, fontWeight: 700, letterSpacing: '-0.03em', height: 50 }}
+                          onFocus={focusInput}
+                          onBlur={blurInput}
+                        />
+                      </div>
+                      <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                        Valor já comprometido que ainda não foi cadastrado conta por conta.
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <Label>Dia de fechamento</Label>
@@ -363,27 +403,6 @@ export function CartaoModal({ open, editando, onSave, onClose }: Props) {
                   <div>
                     <Label>Dia de vencimento</Label>
                     <DayGrid value={diaVencimento} onChange={setDiaVencimento} />
-                  </div>
-
-                  <div>
-                    <Label>Já gastei neste cartão</Label>
-                    <div style={{ position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 14, fontWeight: 600, color: 'var(--text-tertiary)', pointerEvents: 'none', userSelect: 'none' }}>
-                        R$
-                      </span>
-                      <input
-                        value={centavosToDisplay(gastoAtualCentStr)}
-                        onChange={e => setGastoAtualCentStr(e.target.value.replace(/\D/g, ''))}
-                        placeholder="0,00"
-                        inputMode="numeric"
-                        style={{ ...baseInput, paddingLeft: 42, fontSize: 18, fontWeight: 700, letterSpacing: '-0.03em', height: 50 }}
-                        onFocus={focusInput}
-                        onBlur={blurInput}
-                      />
-                    </div>
-                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
-                      Quanto já tem comprometido hoje. Soma na fatura sem precisar cadastrar conta por conta.
-                    </p>
                   </div>
 
                   {/* Toggle como registrar gastos */}

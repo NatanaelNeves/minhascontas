@@ -118,8 +118,8 @@ export function Dashboard({ userId }: { userId: string }) {
           }
           return sum + c.valor
         }, 0)
-      // gastoAtual também é liberado quando a fatura é paga
-      const gastoAtualEfetivo = faturaPaga ? 0 : (cartao.gastoAtual ?? 0)
+      // gastoAtual é limpo no Firestore ao pagar a fatura (marcarFaturaPaga)
+      const gastoAtualEfetivo = cartao.gastoAtual ?? 0
       const totalUsado = totalDeTx + totalDeContas + gastoAtualEfetivo
       const limiteDisponivel = cartao.limite - totalUsado
       const percentualUsado = cartao.limite > 0 ? (totalUsado / cartao.limite) * 100 : 0

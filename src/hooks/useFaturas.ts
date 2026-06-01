@@ -130,6 +130,10 @@ export function useFaturas(
       })
     })
 
+    // Clear manual commitment so the new cycle starts fresh
+    const cartaoRef = doc(db, `users/${userId}/cartoes`, cartaoId)
+    batch.update(cartaoRef, { gastoAtual: deleteField() })
+
     await batch.commit()
   }
 
